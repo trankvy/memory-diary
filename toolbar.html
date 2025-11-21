@@ -1,0 +1,3707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vintage Memory Camera</title>
+    
+    <!-- Google Fonts - Handwritten Style & Calligraphy -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Indie+Flower&family=Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            background: linear-gradient(135deg, #f9f5f0 0%, #fef9f3 25%, #f5ede3 50%, #fdf8f1 75%, #f9f5f0 100%);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 20px;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        /* Floating decorative elements */
+        body::before,
+        body::after {
+            content: '';
+            position: fixed;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-15px) rotate(5deg); }
+        }
+
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(-5deg); }
+        }
+
+        /* Scattered decorative elements */
+        .decor-element {
+            position: fixed;
+            font-size: 40px;
+            opacity: 0.25;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .decor-1 { top: 8%; left: 5%; animation: float 4s ease-in-out infinite; }
+        .decor-2 { top: 15%; right: 8%; animation: floatSlow 5s ease-in-out infinite 0.5s; font-size: 35px; }
+        .decor-3 { top: 25%; left: 12%; animation: float 6s ease-in-out infinite 1s; font-size: 38px; }
+        .decor-4 { top: 40%; right: 15%; animation: floatSlow 4.5s ease-in-out infinite 1.5s; }
+        .decor-5 { bottom: 35%; left: 8%; animation: float 5.5s ease-in-out infinite 2s; font-size: 36px; }
+        .decor-6 { bottom: 20%; right: 10%; animation: floatSlow 5s ease-in-out infinite 2.5s; }
+        .decor-7 { bottom: 10%; left: 15%; animation: float 4.5s ease-in-out infinite 0.5s; font-size: 42px; }
+        .decor-8 { top: 45%; left: 3%; animation: floatSlow 6s ease-in-out infinite 1s; font-size: 34px; }
+        .decor-9 { top: 60%; right: 5%; animation: float 5s ease-in-out infinite 1.8s; }
+        .decor-10 { bottom: 45%; right: 20%; animation: floatSlow 4.8s ease-in-out infinite 0.8s; font-size: 37px; }
+
+        /* Main Title */
+        .title {
+            font-size: 48px;
+            font-weight: 400;
+            color: #8b6f47;
+            text-align: center;
+            margin-bottom: 30px;
+            letter-spacing: 2px;
+            position: relative;
+            text-shadow: 2px 2px 0px rgba(210, 180, 140, 0.2);
+            opacity: 1;
+            text-transform: lowercase;
+        }
+
+        .title.initial-load {
+            animation: fadeInDown 2s ease-out forwards;
+            opacity: 0;
+        }
+
+        @keyframes fadeInDown {
+            0% {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            60% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .title::before {
+            content: '🌸';
+            position: absolute;
+            left: -50px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 32px;
+            opacity: 0.7;
+        }
+
+        .title::after {
+            content: '🌸';
+            position: absolute;
+            right: -50px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 32px;
+            opacity: 0.7;
+        }
+
+        /* View Management */
+        .view {
+            display: none;
+            width: 100%;
+        }
+
+        .view.active {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Camera Container */
+        .camera-section {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .camera-container {
+            opacity: 1;
+            filter: blur(0px);
+            transition: all 0.5s ease;
+        }
+
+        .camera-icon {
+            width: 480px;
+            height: 360px;
+            cursor: pointer;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), filter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.2));
+            object-fit: contain;
+            opacity: 1;
+            transform: none;
+        }
+
+        .camera-icon.initial-load {
+            animation: slideInFromLeft 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+            opacity: 0;
+        }
+
+        @keyframes slideInFromLeft {
+            0% {
+                transform: translateX(-120vw) scale(0.6);
+                opacity: 0;
+            }
+            50% {
+                opacity: 1;
+            }
+            70% {
+                transform: translateX(0) scale(1.05);
+            }
+            85% {
+                transform: translateX(0) scale(0.98);
+            }
+            100% {
+                transform: translateX(0) scale(1);
+                opacity: 1;
+            }
+        }
+
+        .camera-icon:hover:not(.camera-active) {
+            transform: translateY(-10px) scale(1.05);
+        }
+
+        .camera-icon:active:not(.camera-active) {
+            transform: translateY(-5px) scale(1.02);
+        }
+
+        .camera-icon.camera-active {
+            cursor: default;
+            pointer-events: none;
+        }
+
+        .camera-icon.reveal {
+            animation: revealBounce 0.8s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        @keyframes revealBounce {
+            0% {
+                opacity: 0;
+                transform: scale(0.3);
+            }
+            50% {
+                opacity: 1;
+                transform: scale(1.1);
+            }
+            70% {
+                transform: scale(0.95);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* Take Photo Button */
+        .take-photo-btn {
+            background: linear-gradient(135deg, #c9a67c 0%, #b08d5f 100%);
+            color: #ffffff;
+            border: none;
+            border-radius: 30px;
+            padding: 16px 45px;
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            font-size: 20px;
+            font-weight: 400;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            text-transform: lowercase;
+            box-shadow: 0 4px 15px rgba(139, 111, 71, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .take-photo-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 111, 71, 0.35);
+            background: linear-gradient(135deg, #b08d5f 0%, #c9a67c 100%);
+        }
+
+        .take-photo-btn:active {
+            transform: translate(6px, 6px);
+            box-shadow: 0px 0px 0px #000000;
+        }
+
+        .take-photo-btn:disabled {
+            background: #999999;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* Infinite Canvas Container - Full background */
+        .infinite-canvas-section {
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            overflow: hidden;
+            cursor: grab;
+        }
+
+        .infinite-canvas-section:active {
+            cursor: grabbing;
+        }
+
+        .infinite-canvas {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-origin: 0 0;
+            transition: transform 0.1s ease-out;
+        }
+
+        .canvas-title {
+            font-size: 32px;
+            font-weight: 400;
+            color: #8b6f47;
+            text-align: center;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+            text-transform: lowercase;
+            font-family: 'Indie Flower', 'Caveat', cursive;
+        }
+
+        /* Polaroid Style */
+        .polaroid {
+            position: absolute;
+            background: #ffffff;
+            padding: 15px 15px 60px 15px;
+            box-shadow: 
+                0 4px 20px rgba(0, 0, 0, 0.15),
+                0 8px 30px rgba(0, 0, 0, 0.1),
+                inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+            cursor: move;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            user-select: none;
+            z-index: 5;
+            pointer-events: auto;
+        }
+
+        .polaroid:hover {
+            transform: scale(1.02);
+            box-shadow: 
+                0 6px 25px rgba(0, 0, 0, 0.2),
+                0 12px 40px rgba(0, 0, 0, 0.15);
+            z-index: 10;
+        }
+
+        .polaroid img {
+            display: block;
+            width: 200px;
+            height: 200px;
+            object-fit: cover;
+            background: #f5f5f5;
+        }
+
+        .polaroid-buttons {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 20;
+        }
+
+        .polaroid:hover .polaroid-buttons {
+            opacity: 1;
+        }
+
+        .polaroid-btn {
+            background: rgba(255, 255, 255, 0.95);
+            border: 2px solid rgba(139, 111, 71, 0.3);
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            border-radius: 4px;
+            backdrop-filter: blur(10px);
+        }
+
+        .polaroid-btn:hover {
+            background: #ffffff;
+            transform: scale(1.15);
+            border-color: rgba(139, 111, 71, 0.5);
+        }
+
+        /* Sticker Palette */
+        .sticker-palette {
+            width: 100%;
+            max-width: 1200px;
+            margin: 30px auto;
+            background: rgba(255, 252, 245, 0.95);
+            backdrop-filter: blur(20px);
+            border: none;
+            border-radius: 24px 24px 0 0;
+            box-shadow: 0 -4px 20px rgba(139, 111, 71, 0.15),
+                        0 2px 8px rgba(0, 0, 0, 0.05);
+            position: fixed;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            transition: transform 0.3s ease;
+        }
+
+        .sticker-palette.collapsed {
+            transform: translateX(-50%) translateY(calc(100% - 60px));
+        }
+
+        .palette-toggle {
+            width: 100%;
+            padding: 15px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            font-size: 24px;
+            color: #8b6f47;
+            font-weight: 400;
+            transition: all 0.3s ease;
+        }
+
+        .palette-toggle:hover {
+            background: rgba(139, 111, 71, 0.05);
+        }
+
+        .palette-content {
+            padding: 0 35px 35px 35px;
+            max-height: 60vh;
+            overflow-y: auto;
+            transition: opacity 0.3s ease;
+        }
+
+        .palette-content::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .palette-content::-webkit-scrollbar-track {
+            background: rgba(139, 111, 71, 0.05);
+            border-radius: 4px;
+        }
+
+        .palette-content::-webkit-scrollbar-thumb {
+            background: rgba(139, 111, 71, 0.2);
+            border-radius: 4px;
+        }
+
+        .palette-content::-webkit-scrollbar-thumb:hover {
+            background: rgba(139, 111, 71, 0.3);
+        }
+
+        .sticker-palette.collapsed .palette-content {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .sticker-title {
+            font-size: 30px;
+            font-weight: 400;
+            color: #8b6f47;
+            margin-bottom: 30px;
+            letter-spacing: 1px;
+            text-align: center;
+            text-transform: lowercase;
+            font-family: 'Indie Flower', 'Caveat', cursive;
+        }
+
+        .sticker-category-btn {
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            font-size: 18px;
+            font-weight: 400;
+            padding: 12px 28px;
+            background: transparent;
+            color: #8b6f47;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.5px;
+            border-radius: 20px;
+            text-transform: lowercase;
+        }
+
+        .sticker-category-btn:hover {
+            background: rgba(139, 111, 71, 0.08);
+        }
+
+        .sticker-category-btn.active {
+            background: rgba(139, 111, 71, 0.15);
+            color: #6b5435;
+            font-weight: 600;
+        }
+
+        .template-container {
+            background: linear-gradient(135deg, 
+                #fffbf7 0%, 
+                #fef9f4 25%, 
+                #fdf6ed 50%, 
+                #fef9f4 75%, 
+                #fffbf7 100%);
+            border: none;
+            box-shadow: 0 12px 40px rgba(139, 111, 71, 0.15),
+                        0 4px 12px rgba(0, 0, 0, 0.08),
+                        inset 0 0 60px rgba(255, 255, 255, 0.4);
+            padding: 50px;
+            position: relative;
+            min-height: 600px;
+            border-radius: 32px;
+            overflow: hidden;
+        }
+
+        .template-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image: 
+                radial-gradient(circle at 20% 30%, rgba(255, 182, 193, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(216, 191, 216, 0.08) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(255, 239, 213, 0.08) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .template-container > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .template-photo-slot {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.8);
+            border: none;
+            box-shadow: 
+                0 4px 15px rgba(0, 0, 0, 0.08),
+                inset 0 0 20px rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border-radius: 16px;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .template-photo-slot::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 16px;
+            padding: 3px;
+            background: linear-gradient(135deg, 
+                rgba(255, 182, 193, 0.3) 0%, 
+                rgba(216, 191, 216, 0.3) 50%, 
+                rgba(255, 239, 213, 0.3) 100%);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            pointer-events: none;
+        }
+
+        .template-photo-slot:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 25px rgba(139, 111, 71, 0.15);
+        }
+
+        .template-photo-slot img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .template-photo-slot.empty::before {
+            content: '+ add photo';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            font-size: 18px;
+            font-weight: 400;
+            font-style: normal;
+            color: #8b6f47;
+            text-align: center;
+        }
+
+        .template-sticker {
+            position: absolute;
+            cursor: move;
+            font-size: 40px;
+            z-index: 10;
+            transition: transform 0.1s;
+        }
+
+        .template-sticker:hover {
+            transform: scale(1.2);
+        }
+
+        .sticker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+            gap: 20px;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .sticker {
+            font-size: 36px;
+            text-align: center;
+            cursor: grab;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            user-select: none;
+            padding: 0;
+            border: none;
+            background: transparent;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.08));
+        }
+
+        .sticker:hover {
+            transform: scale(1.12);
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.12));
+        }
+
+        .sticker:active {
+            cursor: grabbing;
+            transform: scale(1.05);
+        }
+
+        .sticker.word {
+            background: transparent;
+            border: none;
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            font-weight: 400;
+            font-size: 22px;
+            font-style: normal;
+            padding: 0;
+            letter-spacing: 0.5px;
+            color: #8b6f47;
+            filter: drop-shadow(0 1px 3px rgba(139, 111, 71, 0.2));
+        }
+
+        /* Notification Modal */
+        .notification-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(61, 40, 23, 0.8);
+            backdrop-filter: blur(10px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .notification-overlay.hidden {
+            display: none;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .retro-dialog {
+            background: rgba(255, 252, 245, 0.98);
+            backdrop-filter: blur(20px);
+            border: none;
+            border-radius: 24px;
+            box-shadow: 0 20px 60px rgba(139, 111, 71, 0.2),
+                        0 8px 24px rgba(0, 0, 0, 0.1);
+            max-width: 480px;
+            width: 85%;
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            animation: slideDown 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        @keyframes slideDown {
+            0% {
+                transform: translateY(-100px) rotate(-5deg);
+                opacity: 0;
+            }
+            100% {
+                transform: translateY(0) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .dialog-header {
+            background: transparent;
+            padding: 30px 30px 20px;
+            border-bottom: none;
+        }
+
+        .dialog-title {
+            font-size: 28px;
+            font-weight: 400;
+            color: #8b6f47;
+            margin: 0;
+            text-align: center;
+            letter-spacing: 0.5px;
+            text-transform: lowercase;
+            text-shadow: none;
+        }
+
+        .dialog-content {
+            padding: 40px 30px;
+            text-align: center;
+            background: transparent;
+        }
+
+        .dialog-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        .dialog-message {
+            font-size: 19px;
+            color: #333333;
+            line-height: 1.7;
+            margin-bottom: 12px;
+            font-weight: 400;
+            letter-spacing: 0.3px;
+        }
+
+        .dialog-submessage {
+            font-size: 16px;
+            color: #999999;
+            line-height: 1.6;
+            margin-bottom: 35px;
+            font-weight: 400;
+            font-style: normal;
+        }
+
+        .dialog-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .retro-button {
+            background: linear-gradient(135deg, #c9a67c 0%, #b08d5f 100%);
+            border: none;
+            border-radius: 24px;
+            padding: 14px 32px;
+            font-family: 'Indie Flower', 'Caveat', cursive;
+            font-size: 18px;
+            font-weight: 400;
+            color: #ffffff;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            text-transform: lowercase;
+            box-shadow: 0 4px 15px rgba(139, 111, 71, 0.25);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            min-width: 130px;
+            flex: 1;
+        }
+
+        .retro-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(139, 111, 71, 0.35);
+        }
+
+        .retro-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 10px rgba(139, 111, 71, 0.25);
+        }
+
+        .retro-button.primary {
+            background: #3d2817;
+            color: #ffffff;
+        }
+
+        .retro-button.primary:hover {
+            background: #4d3520;
+        }
+
+        .retro-button.deny {
+            background: transparent;
+            color: #8b6f47;
+            box-shadow: none;
+            border: 2px solid rgba(139, 111, 71, 0.3);
+        }
+
+        .retro-button.deny:hover {
+            background: rgba(139, 111, 71, 0.05);
+            border-color: rgba(139, 111, 71, 0.5);
+            box-shadow: none;
+        }
+
+        /* Notes Dialog Styles */
+        .notes-dialog {
+            max-width: 560px;
+        }
+
+        .notes-textarea {
+            width: 100%;
+            padding: 20px;
+            font-family: 'Caveat', cursive;
+            font-size: 20px;
+            color: #6b5435;
+            background: rgba(255, 252, 245, 0.6);
+            border: 2px solid rgba(139, 111, 71, 0.2);
+            border-radius: 16px;
+            resize: vertical;
+            min-height: 120px;
+            margin-bottom: 25px;
+            line-height: 1.6;
+            transition: all 0.3s ease;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .notes-textarea:focus {
+            outline: none;
+            border-color: rgba(139, 111, 71, 0.4);
+            background: rgba(255, 252, 245, 0.9);
+            box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.08),
+                        0 0 0 3px rgba(139, 111, 71, 0.1);
+        }
+
+        .notes-textarea::placeholder {
+            color: rgba(139, 111, 71, 0.4);
+            font-style: italic;
+        }
+
+        /* Calendar/Diary Styles */
+        .diary-container {
+            background: rgba(255, 252, 245, 0.98);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(139, 111, 71, 0.2);
+        }
+
+        .diary-header {
+            padding: 30px;
+            border-bottom: 2px dashed rgba(139, 111, 71, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .diary-title {
+            font-family: 'Caveat', cursive;
+            font-size: 36px;
+            font-weight: 600;
+            color: #6b5435;
+            margin: 0;
+            text-transform: lowercase;
+        }
+
+        .close-diary-btn {
+            background: none;
+            border: none;
+            font-size: 32px;
+            color: #8b6f47;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .close-diary-btn:hover {
+            transform: scale(1.2);
+        }
+
+        .calendar-grid {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 10px;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, 0.6);
+            border: 2px solid rgba(139, 111, 71, 0.15);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Indie Flower', cursive;
+            font-size: 20px;
+            color: #6b5435;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .calendar-day:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(139, 111, 71, 0.2);
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .calendar-day.has-photos::after {
+            content: '📸';
+            position: absolute;
+            bottom: 5px;
+            font-size: 14px;
+        }
+
+        .calendar-weekday {
+            font-family: 'Caveat', cursive;
+            font-size: 18px;
+            color: #8b6f47;
+            font-weight: 600;
+            text-align: center;
+            padding: 10px;
+        }
+
+        /* Diary Page Styles */
+        .diary-page-container {
+            background: linear-gradient(90deg, 
+                #f5ede3 0%, 
+                #fef9f4 2%, 
+                #fffbf7 48%,
+                #fffbf7 50%,
+                #fffbf7 52%,
+                #fef9f4 98%,
+                #f5ede3 100%);
+            border-radius: 8px;
+            max-width: 1400px;
+            width: 98%;
+            max-height: 95vh;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(139, 111, 71, 0.3),
+                        inset 0 0 30px rgba(139, 111, 71, 0.05);
+            position: relative;
+        }
+
+        .diary-page-header {
+            padding: 20px 30px;
+            border-bottom: 2px dashed rgba(139, 111, 71, 0.15);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 252, 245, 0.95);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .date-nav-container {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .nav-arrow-btn {
+            font-family: 'Indie Flower', cursive;
+            font-size: 24px;
+            padding: 8px 15px;
+            background: transparent;
+            border: 2px solid rgba(139, 111, 71, 0.3);
+            border-radius: 50%;
+            color: #6b5435;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-arrow-btn:hover {
+            background: rgba(139, 111, 71, 0.1);
+            transform: scale(1.1);
+        }
+
+        .diary-page-title {
+            font-family: 'Caveat', cursive;
+            font-size: 32px;
+            font-weight: 600;
+            color: #6b5435;
+            margin: 0;
+        }
+
+        .back-to-calendar-btn, .save-diary-btn {
+            font-family: 'Indie Flower', cursive;
+            font-size: 18px;
+            padding: 10px 20px;
+            background: transparent;
+            border: 2px solid rgba(139, 111, 71, 0.3);
+            border-radius: 20px;
+            color: #6b5435;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .back-to-calendar-btn:hover, .save-diary-btn:hover {
+            background: rgba(139, 111, 71, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .diary-page-content {
+            position: relative;
+            height: calc(95vh - 100px);
+            overflow: hidden;
+        }
+
+        .diary-book-canvas {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+        }
+
+        .diary-page-left, .diary-page-right {
+            position: relative;
+            padding: 40px;
+            min-height: 100%;
+            background-color: #fcfbf9;
+            background-image: radial-gradient(#e0dcd6 1.5px, transparent 1.5px);
+            background-size: 25px 25px;
+        }
+        
+        .diary-page-title {
+            font-family: 'Pinyon Script', cursive;
+            font-size: 72px;
+            color: #1a1a1a;
+            text-align: center;
+            margin: 20px 0 40px 0;
+            font-weight: 400;
+            position: relative;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            z-index: 10;
+            line-height: 1.2;
+        }
+
+        /* Add "Life in" style pseudo-element if we can, or just style the text */
+        .diary-page-title::before {
+            content: 'Life in';
+            display: block;
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 24px;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .diary-draggable-photo {
+            position: absolute;
+            background: white;
+            padding: 12px 12px 45px 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            cursor: move;
+            z-index: 5;
+            transform: rotate(-2deg);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .diary-draggable-photo:hover {
+            transform: rotate(-2deg) scale(1.05);
+            box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2);
+            z-index: 10;
+        }
+
+        .diary-draggable-photo img {
+            width: 150px;
+            height: 150px;
+            object-fit: cover;
+            display: block;
+            pointer-events: none;
+        }
+
+        .photo-delete-btn {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #ff6b6b;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 16px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            z-index: 20;
+        }
+
+        .diary-draggable-photo:hover .photo-delete-btn {
+            opacity: 1;
+        }
+
+        .add-photo-btn {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #c9a67c 0%, #b08d5f 100%);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            font-size: 28px;
+            cursor: pointer;
+            box-shadow: 0 4px 20px rgba(139, 111, 71, 0.3);
+            transition: all 0.3s ease;
+            z-index: 15;
+        }
+
+        .add-photo-btn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 30px rgba(139, 111, 71, 0.4);
+        }
+
+        .drawing-toolbar {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            padding: 12px 20px;
+            background: rgba(255, 252, 245, 0.95);
+            border-radius: 50px;
+            box-shadow: 0 4px 20px rgba(139, 111, 71, 0.2);
+            z-index: 100;
+            flex-wrap: wrap;
+            backdrop-filter: blur(10px);
+            align-items: center;
+            border: 1px solid rgba(139, 111, 71, 0.2);
+        }
+
+        .tool-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            padding: 0 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(139, 111, 71, 0.3);
+            height: 36px;
+        }
+        
+        input[type="color"] {
+            -webkit-appearance: none;
+            appearance: none;
+            border: none;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            background: none;
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0; 
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid rgba(0,0,0,0.1);
+            border-radius: 50%;
+        }
+        
+        .range-wrapper {
+            gap: 8px;
+            font-family: 'Caveat', cursive;
+            color: #6b5435;
+            font-size: 16px;
+        }
+        
+        input[type="range"] {
+            width: 80px;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #e0dcd6;
+            border-radius: 2px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #8b6f47;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+        }
+
+        .color-btn {
+            width: 40px;
+            height: 40px;
+            border: 3px solid white;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .color-btn:hover, .color-btn.active {
+            transform: scale(1.2);
+            border-color: #8b6f47;
+        }
+
+        .draw-tool-btn {
+            font-family: 'Indie Flower', cursive;
+            font-size: 16px;
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid rgba(139, 111, 71, 0.3);
+            border-radius: 20px;
+            color: #6b5435;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .draw-tool-btn:hover {
+            background: rgba(139, 111, 71, 0.1);
+        }
+
+        .diary-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+            pointer-events: none;
+            z-index: 3;
+        }
+
+        .diary-canvas.drawing-mode {
+            pointer-events: all;
+            cursor: crosshair;
+        }
+
+        .diary-text-input {
+            position: absolute;
+            font-family: 'Caveat', cursive;
+            font-size: 22px;
+            color: #6b5435;
+            background: transparent;
+            border: 2px dashed transparent;
+            padding: 10px;
+            resize: none;
+            overflow: hidden;
+            cursor: move;
+            z-index: 4;
+            line-height: 1.4;
+        }
+
+        .diary-text-input:focus {
+            outline: none;
+            border-color: rgba(139, 111, 71, 0.3);
+            cursor: text;
+        }
+
+        /* Video Preview */
+        #videoPreview {
+            display: none;
+            position: absolute;
+            width: 230px;
+            height: 178px;
+            top:58%;
+            left: 46%;
+            transform: translate(-50%, -50%) translateX(-65px) translateY(-2px) scaleX(-1);
+            border: none;
+            z-index: 10;
+            object-fit: cover;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+            border-radius: 2px;
+        }
+        
+        .camera-container.video-active {
+            position: relative;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .title {
+                font-size: 38px;
+                letter-spacing: 4px;
+            }
+
+            .title::before,
+            .title::after {
+                font-size: 24px;
+                left: -40px;
+                right: -40px;
+            }
+
+            .camera-icon {
+                width: 380px;
+                height: 285px;
+            }
+
+            #videoPreview {
+                width: 188px;
+                height: 141px;
+                transform: translate(-50%, -50%) translateX(-51px) translateY(-2px) scaleX(-1);
+            }
+
+            .film-frame img {
+                width: 180px;
+                height: 180px;
+            }
+
+            .film-frame {
+                min-width: 180px;
+            }
+
+            .sticker {
+                font-size: 45px;
+                padding: 8px;
+            }
+
+            .take-photo-btn {
+                padding: 16px 40px;
+                font-size: 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .title {
+                font-size: 30px;
+                letter-spacing: 3px;
+            }
+
+            .title::before,
+            .title::after {
+                font-size: 20px;
+                left: -35px;
+                right: -35px;
+            }
+
+            .camera-icon {
+                width: 300px;
+                height: 225px;
+            }
+
+            #videoPreview {
+                width: 148px;
+                height: 111px;
+                transform: translate(-50%, -50%) translateX(-40px) translateY(-1px) scaleX(-1);
+            }
+
+            .take-photo-btn {
+                padding: 14px 30px;
+                font-size: 14px;
+            }
+
+            .retro-dialog {
+                width: 90%;
+            }
+
+            .dialog-title {
+                font-size: 20px;
+                letter-spacing: 2px;
+            }
+
+            .sticker {
+                font-size: 40px;
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Floating decorative background elements -->
+    <div class="decor-element decor-1">☕</div>
+    <div class="decor-element decor-2">🥐</div>
+    <div class="decor-element decor-3">🌸</div>
+    <div class="decor-element decor-4">🍓</div>
+    <div class="decor-element decor-5">🧁</div>
+    <div class="decor-element decor-6">🌷</div>
+    <div class="decor-element decor-7">🍒</div>
+    <div class="decor-element decor-8">🌹</div>
+    <div class="decor-element decor-9">🥤</div>
+    <div class="decor-element decor-10">🍰</div>
+
+    <!-- Title -->
+    <h1 class="title">memory camera</h1>
+
+    <!-- Retro Notification Modal -->
+    <div class="notification-overlay" id="cameraNotification">
+        <div class="retro-dialog">
+            <div class="dialog-header">
+                <h2 class="dialog-title">camera access</h2>
+            </div>
+            <div class="dialog-content">
+                <span class="dialog-icon">📷</span>
+                <p class="dialog-message">
+                    camera permission required
+                </p>
+                <p class="dialog-submessage">
+                    allow access to capture your memories!
+                </p>
+                <div class="dialog-buttons">
+                    <button class="retro-button deny" onclick="denyAccess()">nope!</button>
+                    <button class="retro-button primary" onclick="allowAccess()">let's go!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notes Dialog -->
+    <div class="notification-overlay" id="notesDialog" style="display: none;">
+        <div class="retro-dialog notes-dialog">
+            <div class="dialog-header">
+                <h2 class="dialog-title">add a note 💌</h2>
+            </div>
+            <div class="dialog-content">
+                <p class="dialog-submessage">capture the moment with words...</p>
+                <textarea id="templateNotes" class="notes-textarea" placeholder="write something sweet..." rows="5"></textarea>
+                <div class="dialog-buttons">
+                    <button class="retro-button deny" onclick="closeNotesDialog()">skip</button>
+                    <button class="retro-button primary" onclick="saveTemplateWithNotes()">save with note ✨</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Text Dialog -->
+    <div class="notification-overlay" id="textDialog" style="display: none;">
+        <div class="retro-dialog notes-dialog">
+            <div class="dialog-header">
+                <h2 class="dialog-title">add custom text ✍️</h2>
+            </div>
+            <div class="dialog-content">
+                <p class="dialog-submessage">write whatever you want...</p>
+                <input type="text" id="customTextInput" class="notes-textarea" placeholder="type your text here..." style="min-height: 60px; font-size: 24px; padding: 15px;">
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 25px; justify-content: center; flex-wrap: wrap;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-family: 'Caveat', cursive; font-size: 18px; color: #6b5435; cursor: pointer;">
+                        <input type="radio" name="textStyle" value="handwritten" checked style="width: 20px; height: 20px;">
+                        <span>handwritten</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-family: 'Caveat', cursive; font-size: 18px; color: #6b5435; cursor: pointer;">
+                        <input type="radio" name="textStyle" value="calligraphy" style="width: 20px; height: 20px;">
+                        <span>calligraphy</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-family: 'Caveat', cursive; font-size: 18px; color: #6b5435; cursor: pointer;">
+                        <input type="radio" name="textStyle" value="bold" style="width: 20px; height: 20px;">
+                        <span>bold</span>
+                    </label>
+                </div>
+
+                <div class="dialog-buttons">
+                    <button class="retro-button deny" onclick="closeTextDialog()">cancel</button>
+                    <button class="retro-button primary" onclick="addCustomTextToTemplate()">add to template ✨</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendar/Diary View -->
+    <!-- Share Canvas Dialog -->
+    <div class="notification-overlay" id="shareDialog" style="display: none;">
+        <div class="retro-dialog" style="max-width: 500px;">
+            <div class="dialog-header">
+                <h2 class="dialog-title">🔗 share canvas</h2>
+                <button class="close-diary-btn" onclick="closeShareDialog()" style="position: absolute; right: 15px; top: 15px;">✕</button>
+            </div>
+            <div class="dialog-content" style="padding: 30px;">
+                
+                <!-- Get YOUR shareable link -->
+                <div style="padding: 25px; background: rgba(139, 111, 71, 0.1); border-radius: 12px; margin-bottom: 25px;">
+                    <p style="font-family: 'Caveat', cursive; font-size: 22px; color: #6b5435; margin-bottom: 20px; text-align: center; font-weight: bold;">
+                        📤 share your canvas
+                    </p>
+                    <button class="retro-button primary" onclick="getShareLink()" style="width: 100%; padding: 15px; font-size: 18px; margin-bottom: 15px;">
+                        ✨ get shareable link
+                    </button>
+                    
+                    <div id="shareLinkDisplay" style="display: none;">
+                        <input type="text" id="shareableLink" readonly 
+                            style="padding: 12px; font-family: 'Caveat', cursive; font-size: 16px; border: 2px solid #8b6f47; border-radius: 8px; text-align: center; background: white; width: 100%; margin-bottom: 10px;">
+                        <button onclick="copyShareLink()" class="retro-button" style="width: 100%; padding: 12px; font-size: 16px;">
+                            📋 copy link
+                        </button>
+                        <p style="font-family: 'Caveat', cursive; font-size: 16px; color: #8b6f47; margin-top: 10px; text-align: center;">
+                            send this link to friends!
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Join friend's canvas -->
+                <div style="padding: 25px; background: rgba(139, 111, 71, 0.05); border-radius: 12px;">
+                    <p style="font-family: 'Caveat', cursive; font-size: 22px; color: #6b5435; margin-bottom: 15px; text-align: center; font-weight: bold;">
+                        📥 join a friend's canvas
+                    </p>
+                    <input type="text" id="friendLinkInput" placeholder="paste your friend's link here" 
+                        style="padding: 15px; font-family: 'Caveat', cursive; font-size: 18px; border: 2px solid rgba(139, 111, 71, 0.3); border-radius: 8px; text-align: center; width: 100%; margin-bottom: 10px;">
+                    <button class="retro-button primary" onclick="joinFriendCanvas()" style="width: 100%; padding: 15px; font-size: 18px;">
+                        🚪 join canvas
+                    </button>
+                </div>
+                
+                <!-- Leave button (shows when in a room) -->
+                <div id="leaveRoomSection" style="display: none; margin-top: 20px;">
+                    <button onclick="leaveSharedRoom()" class="retro-button deny" style="width: 100%; padding: 12px;">
+                        🚪 leave shared canvas
+                    </button>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+
+    <div class="notification-overlay" id="calendarView" style="display: none;">
+        <div class="diary-container">
+            <div class="diary-header">
+                <h2 class="diary-title">📅 memory diary</h2>
+                <button class="close-diary-btn" onclick="closeCalendar()">✕</button>
+            </div>
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Calendar will be generated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Diary Page for Specific Date -->
+    <div class="notification-overlay" id="diaryPage" style="display: none;">
+        <div class="diary-page-container">
+            <div class="diary-page-header">
+                <button class="back-to-calendar-btn" onclick="backToCalendar()">← back to calendar</button>
+                <div class="date-nav-container">
+                    <button class="nav-arrow-btn" onclick="navigateToPrevDate()">←</button>
+                    <h2 class="diary-page-title" id="diaryPageDate">date</h2>
+                    <button class="nav-arrow-btn" onclick="navigateToNextDate()">→</button>
+                </div>
+                <button class="save-diary-btn" onclick="saveDiaryPage()">💾 save</button>
+            </div>
+            
+            <div class="diary-page-content">
+                <div class="diary-book-canvas">
+                    <!-- Left Page -->
+                    <div class="diary-page-left" id="diaryLeftPage">
+                        <!-- Draggable photos and text will be added here -->
+                    </div>
+                    
+                    <!-- Right Page -->
+                    <div class="diary-page-right" id="diaryRightPage">
+                        <!-- Draggable photos and text will be added here -->
+                    </div>
+                </div>
+                
+                <!-- Drawing Canvas (overlay) -->
+                <canvas id="diaryCanvas" class="diary-canvas"></canvas>
+                
+                <!-- Add Photo Button -->
+                <button class="add-photo-btn" onclick="addExistingPhotoToDiary()" title="add photo">+</button>
+                
+                <!-- Drawing Toolbar (floating) -->
+                <div class="drawing-toolbar">
+                    <button onclick="toggleDrawingMode()" class="draw-tool-btn" id="drawModeBtn">✏️ draw</button>
+                    <button onclick="addTextToDiary()" class="draw-tool-btn">✍️ write</button>
+                    
+                    <div class="tool-wrapper" title="Choose Color">
+                        <input type="color" id="drawingColorPicker" value="#000000" onchange="setDrawingColor(this.value)">
+                    </div>
+                    
+                    <div class="tool-wrapper range-wrapper" title="Pen Size">
+                        <span>size</span>
+                        <input type="range" id="penSizeSlider" min="1" max="20" value="3" oninput="updatePenSize(this.value)">
+                    </div>
+
+                    <button onclick="toggleEraser()" class="draw-tool-btn" id="eraserBtn">🧹 eraser</button>
+                    <button onclick="clearDrawing()" class="draw-tool-btn">🗑️ clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Infinite Canvas (Background Layer) -->
+    <div class="infinite-canvas-section" id="canvasSection" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1;">
+        <div class="infinite-canvas" id="infiniteCanvas">
+            <!-- Polaroid photos will be added here -->
+        </div>
+    </div>
+
+    <!-- MAIN VIEW (Camera + Tools on top of canvas) -->
+    <div class="view active" id="cameraView" style="position: relative; z-index: 10; pointer-events: none;">
+        <div style="pointer-events: auto;">
+            <div class="camera-section">
+                <div class="camera-container" id="cameraContainer">
+                    <video id="videoPreview" autoplay playsinline></video>
+                    <img alt="camera icon" class="camera-icon" draggable="false" src="https://i.pinimg.com/originals/f6/66/d6/f666d675232ce971d77b80c48c01e687.png" onclick="handleCameraClick()">
+                </div>
+                <button class="take-photo-btn" id="takePhotoBtn" onclick="takePhoto()" disabled>📸 take photo</button>
+            </div>
+        </div>
+        
+        <!-- Canvas Controls -->
+        <div style="display: flex; gap: 10px; justify-content: center; margin: 20px 0; flex-wrap: wrap; pointer-events: auto;">
+            <button class="take-photo-btn" onclick="openCalendar()" style="padding: 10px 20px; font-size: 16px;">📅 memory diary</button>
+            <button class="take-photo-btn" onclick="openShareDialog()" style="padding: 10px 20px; font-size: 16px;">🔗 share canvas</button>
+        </div>
+        <!-- Sticker Palette -->
+        <div class="sticker-palette collapsed" id="stickerPalette" style="pointer-events: auto;">
+            <button class="palette-toggle" onclick="togglePalette()">
+                <span id="paletteToggleIcon">▲</span>
+                <span>decorate your photos</span>
+            </button>
+            
+            <div class="palette-content">
+                <!-- Sticker Categories -->
+                <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 20px; flex-wrap: wrap;">
+                    <button onclick="showStickerCategory('basic')" class="sticker-category-btn active" data-category="basic">basic</button>
+                    <button onclick="showStickerCategory('cafe')" class="sticker-category-btn" data-category="cafe">café vibes</button>
+                    <button onclick="showStickerCategory('watercolor')" class="sticker-category-btn" data-category="watercolor">summer style</button>
+                </div>
+
+            <!-- Basic Stickers -->
+            <div class="sticker-grid sticker-category" id="basic-stickers">
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🤍</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🩷</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">💗</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">✨</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌙</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">⭐</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🦋</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌸</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌺</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌷</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌹</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">💐</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌻</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌼</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">☁️</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🎀</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🧸</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">💫</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🪷</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🕊️</div>
+            </div>
+
+            <!-- Café Vibes Stickers -->
+            <div class="sticker-grid sticker-category" id="cafe-stickers" style="display: none;">
+                <div class="sticker" draggable="true" ondragstart="drag(event)">☕</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🧋</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍰</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🧁</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍪</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍓</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍒</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🥐</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍩</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🎂</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍦</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍵</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍮</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍬</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍭</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🧸</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">📷</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">💋</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">👗</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">👠</div>
+            </div>
+
+            <!-- Watercolor Art Stickers -->
+            <div class="sticker-grid sticker-category" id="watercolor-stickers" style="display: none;">
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍑</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍊</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍋</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🫐</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍇</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🥭</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌺</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌻</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌼</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌿</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🍃</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌾</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🪴</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🦋</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🐝</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🐞</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">🌈</div>
+                <div class="sticker" draggable="true" ondragstart="drag(event)">☀️</div>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <canvas id="photoCanvas" style="display: none;"></canvas>
+
+    <script>
+        let stream = null;
+        let selectedFrame = null;
+        
+        // Global drag state for polaroids
+        let activeDragPolaroid = null;
+        let polaroidDragOffsetX = 0;
+        let polaroidDragOffsetY = 0;
+
+        // Firebase Configuration
+        // NOTE: Replace these with your own Firebase project credentials
+        // Get them from: https://console.firebase.google.com/
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY_HERE",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        let firebaseApp, database, currentRoomRef;
+        let currentRoomId = null;
+        let isFirebaseEnabled = false;
+
+        try {
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+            database = firebase.database();
+            isFirebaseEnabled = true;
+            console.log('Firebase initialized successfully');
+        } catch (error) {
+            console.warn('Firebase not configured. Sharing features disabled.', error);
+            isFirebaseEnabled = false;
+        }
+
+        // Shared Canvas Functions
+        function openShareDialog() {
+            document.getElementById('shareDialog').style.display = 'flex';
+            // Show leave button if already in a room
+            if (currentRoomId) {
+                document.getElementById('leaveRoomSection').style.display = 'block';
+                document.getElementById('shareLinkDisplay').style.display = 'block';
+                document.getElementById('shareableLink').value = generateShareableLink(currentRoomId);
+            } else {
+                document.getElementById('leaveRoomSection').style.display = 'none';
+                document.getElementById('shareLinkDisplay').style.display = 'none';
+            }
+        }
+
+        function closeShareDialog() {
+            document.getElementById('shareDialog').style.display = 'none';
+        }
+
+        function generateRoomCode() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        async function getShareLink() {
+            if (!isFirebaseEnabled) {
+                alert('⚠️ Firebase not configured. Please add your Firebase credentials to enable sharing.');
+                return;
+            }
+
+            // If already in a room, just show the link
+            if (currentRoomId) {
+                document.getElementById('shareLinkDisplay').style.display = 'block';
+                document.getElementById('shareableLink').value = generateShareableLink(currentRoomId);
+                document.getElementById('leaveRoomSection').style.display = 'block';
+                return;
+            }
+
+            // Create new room
+            const roomId = generateRoomCode();
+            currentRoomId = roomId;
+            currentRoomRef = database.ref('rooms/' + roomId);
+
+            // Initialize room with current canvas state
+            await currentRoomRef.set({
+                createdAt: Date.now(),
+                polaroids: []
+            });
+
+            // Listen for changes
+            setupRoomListeners();
+
+            // Generate and display shareable link
+            const shareableLink = generateShareableLink(roomId);
+            document.getElementById('shareLinkDisplay').style.display = 'block';
+            document.getElementById('shareableLink').value = shareableLink;
+            document.getElementById('leaveRoomSection').style.display = 'block';
+            
+            // Update URL with room parameter
+            const url = new URL(window.location);
+            url.searchParams.set('room', roomId);
+            window.history.replaceState({}, '', url);
+
+            showMessage(`✨ Shareable link created!`);
+        }
+
+        function setupRoomListeners() {
+            if (!currentRoomRef) return;
+
+            // Listen for new polaroids
+            currentRoomRef.child('polaroids').on('child_added', (snapshot) => {
+                // This will fire for existing and new polaroids
+                // We handle loading existing ones in getShareLink
+            });
+        }
+
+        function syncPolaroidToRoom(imageUrl, x, y, rotation, diaryDate, diaryIndex) {
+            if (!currentRoomRef) return;
+
+            const polaroidData = {
+                imageUrl,
+                x,
+                y,
+                rotation,
+                diaryDate,
+                diaryIndex,
+                timestamp: Date.now()
+            };
+
+            currentRoomRef.child('polaroids').push(polaroidData);
+        }
+
+        function leaveSharedRoom() {
+            if (currentRoomRef) {
+                currentRoomRef.off(); // Remove listeners
+            }
+            currentRoomId = null;
+            currentRoomRef = null;
+            document.getElementById('shareLinkDisplay').style.display = 'none';
+            document.getElementById('leaveRoomSection').style.display = 'none';
+            document.getElementById('shareDialog').style.display = 'none';
+            
+            // Remove room parameter from URL
+            const url = new URL(window.location);
+            url.searchParams.delete('room');
+            window.history.replaceState({}, '', url);
+            
+            showMessage('👋 Left shared canvas');
+        }
+
+        function copyShareLink() {
+            const linkInput = document.getElementById('shareableLink');
+            linkInput.select();
+            linkInput.setSelectionRange(0, 99999); // For mobile
+            
+            // Try modern clipboard API first
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(linkInput.value).then(() => {
+                    showMessage('🔗 Link copied! Share with friends!');
+                }).catch(() => {
+                    // Fallback
+                    document.execCommand('copy');
+                    showMessage('🔗 Link copied! Share with friends!');
+                });
+            } else {
+                // Fallback for older browsers
+                document.execCommand('copy');
+                showMessage('🔗 Link copied! Share with friends!');
+            }
+        }
+
+        function generateShareableLink(roomId) {
+            const baseUrl = window.location.origin + window.location.pathname;
+            return `${baseUrl}?room=${roomId}`;
+        }
+
+        // Add initial animation only on first page load
+        window.addEventListener('DOMContentLoaded', function() {
+            const cameraIcon = document.querySelector('.camera-icon');
+            const title = document.querySelector('.title');
+            
+            if (cameraIcon) {
+                cameraIcon.classList.add('initial-load');
+                // Remove class after animation completes to prevent any re-triggering
+                setTimeout(() => {
+                    cameraIcon.classList.remove('initial-load');
+                }, 3000);
+            }
+            if (title) {
+                title.classList.add('initial-load');
+                // Remove class after animation completes
+                setTimeout(() => {
+                    title.classList.remove('initial-load');
+                }, 2000);
+            }
+            
+            // Initialize canvas controls
+            initCanvasControls();
+            
+            // Check if there's a room parameter in URL (friend clicked shared link)
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomParam = urlParams.get('room');
+            if (roomParam && isFirebaseEnabled) {
+                // Auto-join room from URL
+                setTimeout(() => {
+                    autoJoinRoom(roomParam);
+                }, 1000); // Small delay to ensure everything is initialized
+            }
+        });
+
+        // Auto-join room when clicking a shared link
+        async function autoJoinRoom(roomCode) {
+            if (!isFirebaseEnabled) return;
+
+            roomCode = roomCode.toUpperCase();
+
+            // Check if room exists
+            const roomRef = database.ref('rooms/' + roomCode);
+            const snapshot = await roomRef.once('value');
+
+            if (!snapshot.exists()) {
+                showMessage('❌ Room not found');
+                return;
+            }
+
+            currentRoomId = roomCode;
+            currentRoomRef = roomRef;
+
+            // Load existing polaroids from room
+            const roomData = snapshot.val();
+            if (roomData.polaroids) {
+                // Clear current canvas
+                document.getElementById('infiniteCanvas').innerHTML = '';
+                polaroidCounter = 0;
+
+                // Load shared polaroids
+                Object.values(roomData.polaroids).forEach(polaroidData => {
+                    addPolaroidToCanvas(polaroidData.imageUrl, polaroidData.diaryDate, polaroidData.diaryIndex);
+                    const polaroid = document.querySelector(`#infiniteCanvas .polaroid:last-child`);
+                    if (polaroid) {
+                        polaroid.style.left = polaroidData.x + 'px';
+                        polaroid.style.top = polaroidData.y + 'px';
+                        polaroid.style.transform = `rotate(${polaroidData.rotation}deg)`;
+                    }
+                });
+            }
+
+            // Listen for new changes
+            setupRoomListeners();
+
+            showMessage(`🚪 Joined shared canvas: ${roomCode}`);
+        }
+
+        async function joinFriendCanvas() {
+            if (!isFirebaseEnabled) {
+                alert('⚠️ Firebase not configured. Please add your Firebase credentials to enable sharing.');
+                return;
+            }
+
+            let input = document.getElementById('friendLinkInput').value.trim();
+            if (!input) {
+                alert('Please paste your friend\'s link');
+                return;
+            }
+
+            // Extract room code from URL if they pasted a full link
+            let roomCode = input;
+            if (input.includes('?room=')) {
+                const urlParams = new URLSearchParams(input.split('?')[1]);
+                roomCode = urlParams.get('room');
+            } else if (input.includes('room=')) {
+                const urlParams = new URLSearchParams(input);
+                roomCode = urlParams.get('room') || input;
+            }
+            
+            roomCode = roomCode.toUpperCase();
+
+            // Check if room exists
+            const roomRef = database.ref('rooms/' + roomCode);
+            const snapshot = await roomRef.once('value');
+
+            if (!snapshot.exists()) {
+                alert('❌ Room not found. Please check the link and try again.');
+                return;
+            }
+
+            currentRoomId = roomCode;
+            currentRoomRef = roomRef;
+
+            // Load existing polaroids from room
+            const roomData = snapshot.val();
+            if (roomData.polaroids) {
+                // Clear current canvas
+                document.getElementById('infiniteCanvas').innerHTML = '';
+                polaroidCounter = 0;
+
+                // Load shared polaroids
+                Object.values(roomData.polaroids).forEach(polaroidData => {
+                    addPolaroidToCanvas(polaroidData.imageUrl, polaroidData.diaryDate, polaroidData.diaryIndex);
+                    const polaroid = document.querySelector(`#infiniteCanvas .polaroid:last-child`);
+                    if (polaroid) {
+                        polaroid.style.left = polaroidData.x + 'px';
+                        polaroid.style.top = polaroidData.y + 'px';
+                        polaroid.style.transform = `rotate(${polaroidData.rotation}deg)`;
+                    }
+                });
+            }
+
+            // Listen for new changes
+            setupRoomListeners();
+
+            // Update UI
+            document.getElementById('shareLinkDisplay').style.display = 'block';
+            document.getElementById('shareableLink').value = generateShareableLink(roomCode);
+            document.getElementById('leaveRoomSection').style.display = 'block';
+            document.getElementById('shareDialog').style.display = 'none';
+            
+            // Update URL with room parameter
+            const url = new URL(window.location);
+            url.searchParams.set('room', roomCode);
+            window.history.replaceState({}, '', url);
+
+            showMessage(`🚪 Joined friend's canvas!`);
+        }
+
+        // Show notification when camera icon is clicked
+        function handleCameraClick() {
+            console.log('Camera clicked - showing permission request');
+            document.getElementById('cameraNotification').style.display = 'flex';
+        }
+
+        // Handle allow access
+        async function allowAccess() {
+            console.log('Camera access allowed');
+            document.getElementById('cameraNotification').style.display = 'none';
+            
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user' },
+                    audio: false 
+                });
+                
+                const videoPreview = document.getElementById('videoPreview');
+                const cameraContainer = document.getElementById('cameraContainer');
+                const cameraIcon = document.querySelector('.camera-icon');
+                
+                videoPreview.srcObject = stream;
+                videoPreview.style.display = 'block';
+                
+                // Add video-active class to position video inside camera
+                cameraContainer.classList.add('video-active');
+                
+                // Disable camera icon interactions after access is granted
+                if (cameraIcon) {
+                    cameraIcon.classList.add('camera-active');
+                }
+                
+                // Enable take photo button
+                document.getElementById('takePhotoBtn').disabled = false;
+                
+                showMessage('✓ CAMERA READY!');
+                console.log('Camera access granted!', stream);
+            } catch (error) {
+                console.error('Camera access denied:', error);
+                showMessage('✗ CAMERA DENIED');
+            }
+        }
+
+        // Handle deny access
+        function denyAccess() {
+            console.log('Camera access denied by user');
+            document.getElementById('cameraNotification').style.display = 'none';
+            showMessage('✗ ACCESS DENIED');
+            animateCamera();
+        }
+
+        // Animate camera
+        function animateCamera() {
+            const cameraImg = document.querySelector('.camera-icon');
+            cameraImg.classList.add('reveal');
+            setTimeout(() => {
+                cameraImg.classList.remove('reveal');
+            }, 800);
+        }
+
+        // No view switching needed - everything is on one page
+
+        // Camera stays on since we're always on the same page
+
+        // Take photo
+        function takePhoto() {
+            const video = document.getElementById('videoPreview');
+            const canvas = document.getElementById('photoCanvas');
+            const context = canvas.getContext('2d');
+            
+            canvas.width = 480;
+            canvas.height = 480;
+            
+            // Draw video frame to canvas (center crop for square)
+            const videoAspect = video.videoWidth / video.videoHeight;
+            let sx, sy, sw, sh;
+            
+            if (videoAspect > 1) {
+                // Video is wider
+                sh = video.videoHeight;
+                sw = sh;
+                sx = (video.videoWidth - sw) / 2;
+                sy = 0;
+            } else {
+                // Video is taller
+                sw = video.videoWidth;
+                sh = sw;
+                sx = 0;
+                sy = (video.videoHeight - sh) / 2;
+            }
+            
+            // Flip the canvas horizontally to unmirror the selfie
+            context.save();
+            context.scale(-1, 1);
+            context.drawImage(video, sx, sy, sw, sh, -canvas.width, 0, canvas.width, canvas.height);
+            context.restore();
+            
+            // Get image data
+            const imageDataUrl = canvas.toDataURL('image/png');
+            
+            // Save to diary
+            let targetDateStr;
+            
+            // Check if diary page is open and valid
+            const diaryPage = document.getElementById('diaryPage');
+            if (diaryPage.style.display !== 'none' && currentDiaryDate) {
+                targetDateStr = currentDiaryDate;
+            } else {
+                // Default to today
+                const today = new Date();
+                targetDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            }
+            
+            // Initialize diary entry if doesn't exist
+            if (!diaryData[targetDateStr]) {
+                diaryData[targetDateStr] = {
+                    photos: [],
+                    notes: '',
+                    drawing: ''
+                };
+            }
+            
+            if (!diaryData[targetDateStr].photos) {
+                diaryData[targetDateStr].photos = [];
+            }
+            
+            // Add photo to diary data
+            diaryData[targetDateStr].photos.push(imageDataUrl);
+            const photoIndex = diaryData[targetDateStr].photos.length - 1;
+            
+            // Add to infinite canvas as Polaroid, linking to diary
+            addPolaroidToCanvas(imageDataUrl, targetDateStr, photoIndex);
+            
+            // Sync to shared room if active
+            if (currentRoomId) {
+                const lastPolaroid = document.querySelector('#infiniteCanvas .polaroid:last-child');
+                if (lastPolaroid) {
+                    const x = parseFloat(lastPolaroid.style.left) || 0;
+                    const y = parseFloat(lastPolaroid.style.top) || 0;
+                    const rotation = parseFloat(lastPolaroid.style.transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] || 0);
+                    syncPolaroidToRoom(imageDataUrl, x, y, rotation, targetDateStr, photoIndex);
+                }
+            }
+            
+            // If we are currently viewing this date, add it to the page immediately
+            if (currentDiaryDate === targetDateStr && diaryPage.style.display !== 'none') {
+                createDraggablePhoto(imageDataUrl, photoIndex);
+            }
+            
+            // Save to localStorage
+            saveDiaryData();
+            
+            // No view switching - stay on same page
+            
+            showMessage('📸 PHOTO CAPTURED!');
+        }
+
+        // Canvas state
+        let canvasOffsetX = 0;
+        let canvasOffsetY = 0;
+        let isDraggingCanvas = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let polaroidCounter = 0;
+
+        // Initialize canvas controls
+        function initCanvasControls() {
+            const canvasSection = document.getElementById('canvasSection');
+            const canvas = document.getElementById('infiniteCanvas');
+            
+            // Pan canvas with mouse
+            canvasSection.onmousedown = function(e) {
+                // Check if we are clicking on the background
+                if (e.target === canvasSection || e.target === canvas) {
+                    isDraggingCanvas = true;
+                    dragStartX = e.clientX - canvasOffsetX;
+                    dragStartY = e.clientY - canvasOffsetY;
+                }
+            };
+            
+            // Global mouse move for dragging
+            document.addEventListener('mousemove', function(e) {
+                // Handle Canvas Panning
+                if (isDraggingCanvas) {
+                    canvasOffsetX = e.clientX - dragStartX;
+                    canvasOffsetY = e.clientY - dragStartY;
+                    updateCanvasTransform();
+                }
+                
+                // Handle Polaroid Dragging
+                if (activeDragPolaroid) {
+                    const canvasRect = canvas.getBoundingClientRect();
+                    const newX = e.clientX - canvasRect.left - polaroidDragOffsetX - canvasOffsetX;
+                    const newY = e.clientY - canvasRect.top - polaroidDragOffsetY - canvasOffsetY;
+                    
+                    activeDragPolaroid.style.left = newX + 'px';
+                    activeDragPolaroid.style.top = newY + 'px';
+                }
+            });
+            
+            // Global mouse up to stop dragging
+            document.addEventListener('mouseup', function() {
+                isDraggingCanvas = false;
+                activeDragPolaroid = null;
+            });
+            
+            canvasSection.onmouseleave = function() {
+                isDraggingCanvas = false;
+            };
+        }
+
+        function updateCanvasTransform() {
+            const canvas = document.getElementById('infiniteCanvas');
+            canvas.style.transform = `translate(${canvasOffsetX}px, ${canvasOffsetY}px)`;
+        }
+
+        function resetCanvasView() {
+            canvasOffsetX = 0;
+            canvasOffsetY = 0;
+            updateCanvasTransform();
+            showMessage('🔍 View reset');
+        }
+
+        // Add Polaroid to infinite canvas
+        function addPolaroidToCanvas(imageDataUrl, diaryDate = null, diaryIndex = null) {
+            const canvas = document.getElementById('infiniteCanvas');
+            const polaroid = document.createElement('div');
+            polaroid.className = 'polaroid';
+            polaroid.id = 'polaroid-' + Date.now();
+            
+            if (diaryDate && diaryIndex !== null) {
+                polaroid.dataset.diaryDate = diaryDate;
+                polaroid.dataset.diaryIndex = diaryIndex;
+            }
+            
+            // Random position and rotation for authentic look
+            const randomX = 100 + (polaroidCounter % 5) * 250;
+            const randomY = 100 + Math.floor(polaroidCounter / 5) * 300;
+            const randomRotate = (Math.random() - 0.5) * 8; // -4 to +4 degrees
+            
+            polaroid.style.left = randomX + 'px';
+            polaroid.style.top = randomY + 'px';
+            polaroid.style.transform = `rotate(${randomRotate}deg)`;
+            
+            const img = document.createElement('img');
+            img.src = imageDataUrl;
+            img.alt = 'Memory photo';
+            img.draggable = false;
+            
+            const buttons = document.createElement('div');
+            buttons.className = 'polaroid-buttons';
+            buttons.innerHTML = `
+                <button class="polaroid-btn" onclick="addTextToPhoto('${polaroid.id}')" title="Add Text">✍️</button>
+                <button class="polaroid-btn" onclick="downloadPolaroid('${polaroid.id}')" title="Download">💾</button>
+                <button class="polaroid-btn" onclick="deletePolaroid('${polaroid.id}')" title="Delete">🗑️</button>
+            `;
+            
+            polaroid.appendChild(img);
+            polaroid.appendChild(buttons);
+            
+            // Make Polaroid draggable
+            polaroid.onmousedown = function(e) {
+                if (e.target.classList.contains('polaroid-btn')) return;
+                
+                activeDragPolaroid = polaroid;
+                const rect = polaroid.getBoundingClientRect();
+                polaroidDragOffsetX = e.clientX - rect.left;
+                polaroidDragOffsetY = e.clientY - rect.top;
+                
+                e.stopPropagation(); // Prevent canvas panning
+            };
+            
+            // Enable drag and drop for stickers
+            polaroid.ondrop = function(event) {
+                event.preventDefault();
+                const sticker = event.dataTransfer.getData('text');
+                const classes = event.dataTransfer.getData('classes');
+                addStickerToPolaroid(polaroid, sticker, event.offsetX, event.offsetY, classes);
+            };
+            polaroid.ondragover = function(event) {
+                event.preventDefault();
+            };
+            
+            canvas.appendChild(polaroid);
+            polaroidCounter++;
+        }
+
+        // Drag and drop functions
+        function drag(event) {
+            event.dataTransfer.setData('text', event.target.textContent);
+            event.dataTransfer.setData('classes', event.target.className);
+        }
+
+        function addStickerToFrame(frame, stickerText, x, y, stickerClasses = '') {
+            const stickerElement = document.createElement('div');
+            stickerElement.textContent = stickerText;
+            stickerElement.className = stickerClasses;
+            stickerElement.style.cssText = `
+                position: absolute;
+                font-size: 32px;
+                left: ${x}px;
+                top: ${y}px;
+                cursor: move;
+                user-select: none;
+                pointer-events: auto;
+                z-index: 10;
+            `;
+            
+            // Make sticker draggable within frame
+            let isDragging = false;
+            let offsetX, offsetY;
+            
+            stickerElement.onmousedown = function(e) {
+                isDragging = true;
+                offsetX = e.offsetX;
+                offsetY = e.offsetY;
+                e.stopPropagation();
+            };
+            
+            frame.onmousemove = function(e) {
+                if (isDragging) {
+                    stickerElement.style.left = (e.offsetX - offsetX) + 'px';
+                    stickerElement.style.top = (e.offsetY - offsetY) + 'px';
+                }
+            };
+            
+            frame.onmouseup = function() {
+                isDragging = false;
+            };
+            
+            // Double click to remove sticker
+            stickerElement.ondblclick = function() {
+                stickerElement.remove();
+            };
+            
+            frame.appendChild(stickerElement);
+        }
+
+        function addStickerToPolaroid(polaroid, stickerText, x, y, stickerClasses = '') {
+            const stickerElement = document.createElement('div');
+            stickerElement.textContent = stickerText;
+            stickerElement.className = stickerClasses;
+            stickerElement.style.cssText = `
+                position: absolute;
+                font-size: 32px;
+                left: ${x}px;
+                top: ${y}px;
+                cursor: move;
+                user-select: none;
+                pointer-events: auto;
+                z-index: 10;
+            `;
+            
+            // Make sticker draggable within polaroid
+            let isDragging = false;
+            let offsetX, offsetY;
+            
+            stickerElement.onmousedown = function(e) {
+                isDragging = true;
+                offsetX = e.offsetX;
+                offsetY = e.offsetY;
+                e.stopPropagation();
+            };
+            
+            polaroid.onmousemove = function(e) {
+                if (isDragging) {
+                    stickerElement.style.left = (e.offsetX - offsetX) + 'px';
+                    stickerElement.style.top = (e.offsetY - offsetY) + 'px';
+                }
+            };
+            
+            polaroid.onmouseup = function() {
+                isDragging = false;
+            };
+            
+            // Double click to remove sticker
+            stickerElement.ondblclick = function() {
+                stickerElement.remove();
+            };
+            
+            polaroid.appendChild(stickerElement);
+            
+            // Save to diary if linked
+            if (polaroid.dataset.diaryDate && polaroid.dataset.diaryIndex) {
+                const date = polaroid.dataset.diaryDate;
+                const index = parseInt(polaroid.dataset.diaryIndex);
+                
+                if (diaryData[date]) {
+                    if (!diaryData[date].photoStickers) diaryData[date].photoStickers = {};
+                    if (!diaryData[date].photoStickers[index]) diaryData[date].photoStickers[index] = [];
+                    
+                    diaryData[date].photoStickers[index].push({
+                        text: stickerText,
+                        x: x + 'px',
+                        y: y + 'px',
+                        classes: stickerClasses
+                    });
+                    saveDiaryData();
+                }
+            }
+        }
+
+        // Download photo (for templates)
+        function downloadPhoto(frameId) {
+            const frame = document.getElementById(frameId);
+            if (!frame) return;
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            canvas.width = 480;
+            canvas.height = 480;
+            
+            const img = frame.querySelector('img');
+            context.drawImage(img, 0, 0, 480, 480);
+            
+            // Draw stickers on canvas
+            const stickers = frame.querySelectorAll('div[style*="position: absolute"]');
+            stickers.forEach(sticker => {
+                const stickerText = sticker.textContent;
+                const left = parseInt(sticker.style.left);
+                const top = parseInt(sticker.style.top);
+                
+                // Check if it's custom text
+                if (stickerText && sticker.classList && sticker.classList.contains('custom-text')) {
+                    const fontSize = parseInt(sticker.style.fontSize) || 24;
+                    const fontWeight = sticker.style.fontWeight || '400';
+                    const fontFamily = sticker.style.fontFamily.includes('Caveat') ? 'Caveat' : 'Indie Flower';
+                    context.font = `${fontWeight} ${Math.max(fontSize * 2, 40)}px "${fontFamily}"`;
+                    context.fillStyle = sticker.style.color || '#8b6f47';
+                    context.fillText(stickerText, left * 2.18, top * 2.18 + fontSize * 2);
+                } else {
+                    context.font = '50px Arial';
+                    context.fillText(stickerText, left * 2.18, top * 2.18 + 35);
+                }
+            });
+            
+            // Download
+            const link = document.createElement('a');
+            link.download = 'memory-' + Date.now() + '.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            
+            showMessage('💾 SAVED!');
+        }
+
+        // Download Polaroid
+        function downloadPolaroid(polaroidId) {
+            const polaroid = document.getElementById(polaroidId);
+            if (!polaroid) return;
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Polaroid dimensions: 230px wide (200px image + 15px padding each side), 275px tall (200px image + 15px top + 60px bottom)
+            canvas.width = 230;
+            canvas.height = 275;
+            
+            // White background
+            context.fillStyle = '#ffffff';
+            context.fillRect(0, 0, 230, 275);
+            
+            const img = polaroid.querySelector('img');
+            const tempImg = new Image();
+            tempImg.crossOrigin = 'anonymous';
+            tempImg.onload = function() {
+                // Draw image
+                context.drawImage(tempImg, 15, 15, 200, 200);
+                
+                // Draw stickers on canvas
+                const stickers = polaroid.querySelectorAll('div[style*="position: absolute"]');
+                stickers.forEach(sticker => {
+                    const stickerText = sticker.textContent;
+                    const left = parseInt(sticker.style.left);
+                    const top = parseInt(sticker.style.top);
+                    
+                    // Check if it's custom text
+                    if (stickerText && sticker.classList && sticker.classList.contains('custom-text')) {
+                        const fontSize = parseInt(sticker.style.fontSize) || 24;
+                        const fontWeight = sticker.style.fontWeight || '400';
+                        const fontFamily = sticker.style.fontFamily.includes('Caveat') ? 'Caveat' : 'Indie Flower';
+                        context.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
+                        context.fillStyle = sticker.style.color || '#8b6f47';
+                        context.fillText(stickerText, left, top + fontSize);
+                    } else {
+                        context.font = '32px Arial';
+                        context.fillText(stickerText, left, top + 30);
+                    }
+                });
+                
+                // Download
+                const link = document.createElement('a');
+                link.download = 'polaroid-' + Date.now() + '.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                
+                showMessage('💾 POLAROID SAVED!');
+            };
+            tempImg.src = img.src;
+        }
+
+        // Delete photo
+        function deletePhoto(frameId) {
+            if (confirm('Delete this memory?')) {
+                const element = document.getElementById(frameId);
+                if (element) element.remove();
+                showMessage('🗑️ DELETED');
+            }
+        }
+
+        // Delete Polaroid
+        function deletePolaroid(polaroidId) {
+            if (confirm('Delete this polaroid?')) {
+                const polaroid = document.getElementById(polaroidId);
+                if (polaroid) {
+                    // Remove from diary data if linked
+                    if (polaroid.dataset.diaryDate && polaroid.dataset.diaryIndex) {
+                        const date = polaroid.dataset.diaryDate;
+                        const index = parseInt(polaroid.dataset.diaryIndex);
+                        
+                        if (diaryData[date] && diaryData[date].photos) {
+                            // Mark as deleted (null) to preserve indices
+                            diaryData[date].photos[index] = null;
+                            if (diaryData[date].photoStickers && diaryData[date].photoStickers[index]) {
+                                delete diaryData[date].photoStickers[index];
+                            }
+                            saveDiaryData();
+                        }
+                    }
+                    polaroid.remove();
+                }
+                showMessage('🗑️ DELETED');
+            }
+        }
+
+        // Show temporary message
+        function showMessage(text) {
+            const msg = document.createElement('div');
+            msg.textContent = text;
+            msg.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #f5e6d3;
+                border: 4px solid #000000;
+                border-radius: 0;
+                padding: 15px 30px;
+                font-family: 'Courier New', 'Courier', monospace;
+                font-weight: 900;
+                font-size: 14px;
+                color: #000000;
+                box-shadow: 5px 5px 0px #000000;
+                z-index: 2000;
+                animation: slideIn 0.3s ease;
+                letter-spacing: 1px;
+            `;
+            document.body.appendChild(msg);
+            setTimeout(() => {
+                msg.style.animation = 'fadeOut 0.3s ease';
+                setTimeout(() => msg.remove(), 300);
+            }, 3000);
+        }
+
+        // Sticker category switching
+        function showStickerCategory(category) {
+            // Hide all categories
+            document.querySelectorAll('.sticker-category').forEach(cat => {
+                cat.style.display = 'none';
+            });
+            
+            // Show selected category
+            document.getElementById(category + '-stickers').style.display = 'grid';
+            
+            // Update button states
+            document.querySelectorAll('.sticker-category-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+        }
+
+        // Toggle palette open/close
+        function togglePalette() {
+            const palette = document.getElementById('stickerPalette');
+            const icon = document.getElementById('paletteToggleIcon');
+            
+            palette.classList.toggle('collapsed');
+            
+            if (palette.classList.contains('collapsed')) {
+                icon.textContent = '▲';
+            } else {
+                icon.textContent = '▼';
+            }
+        }
+
+        // Template system variables
+        let currentTemplate = null;
+        let currentTemplateType = '';
+        let templatePhotos = [];
+        let photoSlotIndex = 0;
+
+        // Create template
+        function createTemplate(type) {
+            currentTemplateType = type;
+            templatePhotos = [];
+            photoSlotIndex = 0;
+            
+            const container = document.getElementById('templateContainer');
+            container.innerHTML = '';
+            
+            let templateHTML = '';
+            
+            if (type === 'postcard') {
+                // Postcard: 1 large photo + decorative elements
+                templateHTML = `
+                    <div class="template-container" style="width: 600px; height: 400px;">
+                        <div style="position: absolute; top: 25px; left: 30px; font-family: 'Caveat'; font-size: 32px; font-weight: 600; color: #6b5435; z-index: 2;">
+                            memories ✉️
+                        </div>
+                        <div style="position: absolute; top: 25px; right: 30px; font-size: 28px; opacity: 0.5; z-index: 2;">🌸</div>
+                        <div style="position: absolute; bottom: 30px; left: 30px; font-size: 24px; opacity: 0.5; z-index: 2;">🌿</div>
+                        <div style="position: absolute; bottom: 30px; right: 30px; font-size: 26px; opacity: 0.5; z-index: 2;">🦋</div>
+                        <div class="template-photo-slot empty" data-slot="0" onclick="addPhotoToTemplate(0)" 
+                             style="width: 360px; height: 280px; top: 80px; left: 120px; transform: rotate(-1.5deg);"></div>
+                    </div>
+                `;
+            } else if (type === 'scrapbook') {
+                // Scrapbook: Multiple photos in artistic layout
+                templateHTML = `
+                    <div class="template-container" style="width: 800px; height: 600px;">
+                        <div style="position: absolute; top: 30px; left: 50%; transform: translateX(-50%); font-family: 'Caveat'; font-size: 38px; font-weight: 600; color: #6b5435; text-align: center; z-index: 2;">
+                            my scrapbook 📖
+                        </div>
+                        <div style="position: absolute; top: 30px; left: 40px; font-size: 30px; opacity: 0.4; z-index: 0;">🍋</div>
+                        <div style="position: absolute; top: 40px; right: 40px; font-size: 32px; opacity: 0.4; z-index: 0;">🍓</div>
+                        <div style="position: absolute; bottom: 40px; left: 50px; font-size: 28px; opacity: 0.4; z-index: 0;">🌺</div>
+                        <div style="position: absolute; bottom: 50px; right: 60px; font-size: 30px; opacity: 0.4; z-index: 0;">🌻</div>
+                        <div style="position: absolute; top: 50%; left: 40px; font-size: 24px; opacity: 0.35; z-index: 0;">🌿</div>
+                        <div style="position: absolute; top: 50%; right: 40px; font-size: 26px; opacity: 0.35; z-index: 0;">🍃</div>
+                        <div class="template-photo-slot empty" data-slot="0" onclick="addPhotoToTemplate(0)" 
+                             style="width: 260px; height: 260px; top: 100px; left: 60px; transform: rotate(-4deg);"></div>
+                        <div class="template-photo-slot empty" data-slot="1" onclick="addPhotoToTemplate(1)" 
+                             style="width: 260px; height: 260px; top: 100px; right: 60px; transform: rotate(3deg);"></div>
+                        <div class="template-photo-slot empty" data-slot="2" onclick="addPhotoToTemplate(2)" 
+                             style="width: 260px; height: 260px; bottom: 60px; left: 60px; transform: rotate(2deg);"></div>
+                        <div class="template-photo-slot empty" data-slot="3" onclick="addPhotoToTemplate(3)" 
+                             style="width: 260px; height: 260px; bottom: 60px; right: 60px; transform: rotate(-3deg);"></div>
+                    </div>
+                `;
+            } else if (type === 'photobook') {
+                // Photobook: Grid layout with title
+                templateHTML = `
+                    <div class="template-container" style="width: 700px; height: 500px;">
+                        <div style="position: absolute; top: 35px; left: 50%; transform: translateX(-50%); font-family: 'Caveat'; font-size: 36px; font-weight: 600; color: #6b5435; text-align: center; z-index: 2;">
+                            photo album 📔
+                        </div>
+                        <div style="position: absolute; top: 35px; left: 50px; font-size: 28px; opacity: 0.4; z-index: 0;">🍑</div>
+                        <div style="position: absolute; top: 40px; right: 50px; font-size: 28px; opacity: 0.4; z-index: 0;">🍊</div>
+                        <div style="position: absolute; bottom: 45px; left: 55px; font-size: 26px; opacity: 0.4; z-index: 0;">🌸</div>
+                        <div style="position: absolute; bottom: 45px; right: 55px; font-size: 26px; opacity: 0.4; z-index: 0;">🌷</div>
+                        <div style="position: absolute; top: 55%; left: 30px; font-size: 24px; opacity: 0.35; z-index: 0;">🦋</div>
+                        <div style="position: absolute; top: 45%; right: 30px; font-size: 24px; opacity: 0.35; z-index: 0;">☀️</div>
+                        <div class="template-photo-slot empty" data-slot="0" onclick="addPhotoToTemplate(0)" 
+                             style="width: 180px; height: 180px; top: 130px; left: 80px; transform: rotate(-1deg);"></div>
+                        <div class="template-photo-slot empty" data-slot="1" onclick="addPhotoToTemplate(1)" 
+                             style="width: 180px; height: 180px; top: 130px; left: 50%; transform: translateX(-50%) rotate(1deg);"></div>
+                        <div class="template-photo-slot empty" data-slot="2" onclick="addPhotoToTemplate(2)" 
+                             style="width: 180px; height: 180px; top: 130px; right: 80px; transform: rotate(-0.5deg);"></div>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = templateHTML;
+            document.getElementById('templateCanvas').style.display = 'block';
+            
+            // Enable drag and drop for stickers on template
+            const templateContainer = container.querySelector('.template-container');
+            templateContainer.ondrop = function(event) {
+                event.preventDefault();
+                const sticker = event.dataTransfer.getData('text');
+                const classes = event.dataTransfer.getData('classes');
+                addStickerToTemplate(sticker, event.offsetX, event.offsetY, classes);
+            };
+            templateContainer.ondragover = function(event) {
+                event.preventDefault();
+            };
+            
+            // Scroll to template
+            document.getElementById('templateCanvas').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Add photo from Polaroids to template
+        function addPhotoToTemplate(slotIndex) {
+            const canvas = document.getElementById('infiniteCanvas');
+            const photos = canvas.querySelectorAll('.polaroid img');
+            
+            if (photos.length === 0) {
+                showMessage('📸 Take some photos first!');
+                return;
+            }
+            
+            // Use the last photo taken, or cycle through available photos
+            const photoIndex = slotIndex % photos.length;
+            const photoSrc = photos[photoIndex].src;
+            
+            const slot = document.querySelector(`.template-photo-slot[data-slot="${slotIndex}"]`);
+            if (slot) {
+                slot.classList.remove('empty');
+                slot.innerHTML = `<img src="${photoSrc}" alt="Photo">`;
+            }
+        }
+
+        // Add sticker to template
+        function addStickerToTemplate(stickerText, x, y, stickerClasses = '') {
+            const container = document.querySelector('.template-container');
+            const stickerElement = document.createElement('div');
+            stickerElement.className = stickerClasses ? stickerClasses + ' template-sticker' : 'template-sticker';
+            stickerElement.textContent = stickerText;
+            stickerElement.style.left = x + 'px';
+            stickerElement.style.top = y + 'px';
+            stickerElement.style.position = 'absolute';
+            
+            // Make sticker draggable
+            let isDragging = false;
+            let offsetX, offsetY;
+            
+            stickerElement.onmousedown = function(e) {
+                isDragging = true;
+                offsetX = e.offsetX;
+                offsetY = e.offsetY;
+                e.stopPropagation();
+            };
+            
+            container.onmousemove = function(e) {
+                if (isDragging) {
+                    const rect = container.getBoundingClientRect();
+                    stickerElement.style.left = (e.clientX - rect.left - offsetX) + 'px';
+                    stickerElement.style.top = (e.clientY - rect.top - offsetY) + 'px';
+                }
+            };
+            
+            container.onmouseup = function() {
+                isDragging = false;
+            };
+            
+            // Double click to remove
+            stickerElement.ondblclick = function() {
+                stickerElement.remove();
+            };
+            
+            container.appendChild(stickerElement);
+        }
+
+        // Save template - show notes dialog first
+        function saveTemplate() {
+            const container = document.querySelector('.template-container');
+            const photoSlots = container.querySelectorAll('.template-photo-slot img');
+            
+            if (photoSlots.length === 0) {
+                showMessage('⚠️ Add photos to template first!');
+                return;
+            }
+
+            // Show notes dialog
+            document.getElementById('notesDialog').style.display = 'flex';
+            document.getElementById('templateNotes').value = '';
+            document.getElementById('templateNotes').focus();
+        }
+
+        // Close notes dialog
+        function closeNotesDialog() {
+            document.getElementById('notesDialog').style.display = 'none';
+        }
+
+        // Save template with notes
+        function saveTemplateWithNotes() {
+            const notes = document.getElementById('templateNotes').value.trim();
+            closeNotesDialog();
+            
+            const container = document.querySelector('.template-container');
+            const photoSlots = container.querySelectorAll('.template-photo-slot img');
+            
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            
+            // Set canvas size to template size
+            const width = container.offsetWidth;
+            const height = container.offsetHeight;
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Draw watercolor gradient background
+            const gradient = context.createLinearGradient(0, 0, width, height);
+            gradient.addColorStop(0, '#fffbf7');
+            gradient.addColorStop(0.5, '#fdf6ed');
+            gradient.addColorStop(1, '#fffbf7');
+            context.fillStyle = gradient;
+            context.fillRect(0, 0, width, height);
+            
+            // Draw soft watercolor circles
+            context.globalAlpha = 0.08;
+            const circles = [
+                { x: width * 0.2, y: height * 0.3, r: 100, color: '#ffb6c1' },
+                { x: width * 0.8, y: height * 0.7, r: 120, color: '#d8bfd8' },
+                { x: width * 0.4, y: height * 0.8, r: 90, color: '#ffefd5' }
+            ];
+            circles.forEach(circle => {
+                context.fillStyle = circle.color;
+                context.beginPath();
+                context.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2);
+                context.fill();
+            });
+            context.globalAlpha = 1;
+            
+            // Draw title text based on template type
+            context.font = '600 32px "Caveat"';
+            context.fillStyle = '#6b5435';
+            context.textAlign = 'center';
+            if (currentTemplateType === 'postcard') {
+                context.fillText('memories ✉️', width * 0.25, 45);
+            } else if (currentTemplateType === 'scrapbook') {
+                context.fillText('my scrapbook 📖', width / 2, 50);
+            } else if (currentTemplateType === 'photobook') {
+                context.fillText('photo album 📔', width / 2, 60);
+            }
+            
+            // Draw photos
+            let loadedImages = 0;
+            const totalImages = photoSlots.length;
+            
+            photoSlots.forEach((img, index) => {
+                const tempImg = new Image();
+                tempImg.crossOrigin = 'anonymous';
+                tempImg.onload = function() {
+                    const slot = img.parentElement;
+                    const rect = slot.getBoundingClientRect();
+                    const containerRect = container.getBoundingClientRect();
+                    const x = rect.left - containerRect.left;
+                    const y = rect.top - containerRect.top;
+                    
+                    // Draw photo
+                    context.drawImage(tempImg, x, y, rect.width, rect.height);
+                    
+                    // Draw photo border
+                    context.strokeStyle = '#3d2817';
+                    context.lineWidth = 4;
+                    context.strokeRect(x, y, rect.width, rect.height);
+                    
+                    loadedImages++;
+                    if (loadedImages === totalImages) {
+                        // Draw stickers
+                        const stickers = container.querySelectorAll('.template-sticker');
+                        stickers.forEach(sticker => {
+                            const stickerText = sticker.textContent;
+                            const left = parseInt(sticker.style.left);
+                            const top = parseInt(sticker.style.top);
+                            
+                            // Check if it's custom text with specific styling
+                            if (sticker.classList.contains('custom-text')) {
+                                const fontSize = parseInt(sticker.style.fontSize);
+                                const fontWeight = sticker.style.fontWeight;
+                                const fontFamily = sticker.style.fontFamily.includes('Caveat') ? 'Caveat' : 'Indie Flower';
+                                context.font = `${fontWeight} ${fontSize}px "${fontFamily}"`;
+                                context.fillStyle = sticker.style.color;
+                                context.fillText(stickerText, left, top + fontSize);
+                            } else if (sticker.classList.contains('word')) {
+                                context.font = '400 26px "Caveat"';
+                                context.fillStyle = '#8b6f47';
+                                context.fillText(stickerText, left, top + 30);
+                            } else {
+                                context.font = '40px Arial';
+                                context.fillStyle = '#000000';
+                                context.fillText(stickerText, left, top + 40);
+                            }
+                        });
+                        
+                        // Draw notes if provided
+                        if (notes) {
+                            context.font = '500 22px "Caveat"';
+                            context.fillStyle = '#6b5435';
+                            context.textAlign = 'left';
+                            const maxWidth = width - 120;
+                            const lineHeight = 30;
+                            let yPos = height - 80;
+                            
+                            // Word wrap the notes
+                            const words = notes.split(' ');
+                            let line = '';
+                            words.forEach(word => {
+                                const testLine = line + word + ' ';
+                                const metrics = context.measureText(testLine);
+                                if (metrics.width > maxWidth && line !== '') {
+                                    context.fillText(line, 60, yPos);
+                                    line = word + ' ';
+                                    yPos += lineHeight;
+                                } else {
+                                    line = testLine;
+                                }
+                            });
+                            context.fillText(line, 60, yPos);
+                        }
+                        
+                        // Download
+                        const link = document.createElement('a');
+                        link.download = `${currentTemplateType}-${Date.now()}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        showMessage('💾 TEMPLATE SAVED!');
+                    }
+                };
+                tempImg.src = img.src;
+            });
+        }
+
+        // Close template
+        function closeTemplate() {
+            document.getElementById('templateCanvas').style.display = 'none';
+            currentTemplate = null;
+            currentTemplateType = '';
+        }
+
+        // Show text dialog
+        function showTextDialog() {
+            const templateCanvas = document.getElementById('templateCanvas');
+            if (templateCanvas.style.display === 'none') {
+                showMessage('⚠️ Create a template first!');
+                return;
+            }
+            window.currentTextTarget = 'template';
+            document.getElementById('textDialog').style.display = 'flex';
+            document.getElementById('customTextInput').value = '';
+            document.getElementById('customTextInput').focus();
+        }
+
+        // Add text to photo in film strip
+        function addTextToPhoto(frameId) {
+            window.currentTextTarget = frameId;
+            document.getElementById('textDialog').style.display = 'flex';
+            document.getElementById('customTextInput').value = '';
+            document.getElementById('customTextInput').focus();
+        }
+
+        // Close text dialog
+        function closeTextDialog() {
+            document.getElementById('textDialog').style.display = 'none';
+        }
+
+        // Add custom text to template
+        function addCustomTextToTemplate() {
+            const text = document.getElementById('customTextInput').value.trim();
+            if (!text) {
+                showMessage('⚠️ Please enter some text!');
+                return;
+            }
+
+            const style = document.querySelector('input[name="textStyle"]:checked').value;
+            closeTextDialog();
+
+            // Check if adding to template or photo
+            let container;
+            if (window.currentTextTarget === 'template') {
+                container = document.querySelector('.template-container');
+            } else {
+                container = document.getElementById(window.currentTextTarget);
+                if (!container) {
+                    showMessage('⚠️ Photo not found!');
+                    return;
+                }
+            }
+            const textElement = document.createElement('div');
+            textElement.className = 'template-sticker custom-text';
+            textElement.textContent = text;
+            
+            // Check if adding to film strip photo (smaller size) or template (larger size)
+            const isFilmStripPhoto = container.classList.contains('film-frame');
+            
+            // Apply style based on selection
+            if (style === 'handwritten') {
+                textElement.style.fontFamily = "'Indie Flower', cursive";
+                textElement.style.fontSize = isFilmStripPhoto ? '16px' : '24px';
+                textElement.style.fontWeight = '400';
+                textElement.style.color = '#8b6f47';
+            } else if (style === 'calligraphy') {
+                textElement.style.fontFamily = "'Caveat', cursive";
+                textElement.style.fontSize = isFilmStripPhoto ? '20px' : '32px';
+                textElement.style.fontWeight = '600';
+                textElement.style.color = '#6b5435';
+            } else if (style === 'bold') {
+                textElement.style.fontFamily = "'Caveat', cursive";
+                textElement.style.fontSize = isFilmStripPhoto ? '24px' : '36px';
+                textElement.style.fontWeight = '700';
+                textElement.style.color = '#3d2817';
+            }
+            
+            textElement.style.position = 'absolute';
+            textElement.style.left = '50%';
+            textElement.style.top = '50%';
+            textElement.style.transform = 'translate(-50%, -50%)';
+            textElement.style.cursor = 'move';
+            textElement.style.zIndex = '10';
+            textElement.style.whiteSpace = 'nowrap';
+            textElement.style.filter = 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15))';
+            
+            // Make text draggable
+            let isDragging = false;
+            let offsetX, offsetY;
+            
+            textElement.onmousedown = function(e) {
+                isDragging = true;
+                offsetX = e.offsetX;
+                offsetY = e.offsetY;
+                e.stopPropagation();
+            };
+            
+            container.onmousemove = function(e) {
+                if (isDragging) {
+                    const rect = container.getBoundingClientRect();
+                    textElement.style.left = (e.clientX - rect.left - offsetX) + 'px';
+                    textElement.style.top = (e.clientY - rect.top - offsetY) + 'px';
+                    textElement.style.transform = 'none';
+                }
+            };
+            
+            container.onmouseup = function() {
+                isDragging = false;
+            };
+            
+            // Double click to remove
+            textElement.ondblclick = function() {
+                if (confirm('Remove this text?')) {
+                    textElement.remove();
+                }
+            };
+            
+            container.appendChild(textElement);
+            showMessage('✨ Text added! Drag to position, double-click to remove');
+        }
+
+        // Calendar/Diary Functions
+        let diaryData = {};  // Store diary entries by date
+        let currentDiaryDate = null;
+        let drawingCanvas = null;
+        let drawingContext = null;
+        let isDrawing = false;
+        let currentColor = '#000000';
+        let penSize = 3;
+        let isEraser = false;
+
+        // Load diary data from localStorage
+        function loadDiaryData() {
+            const saved = localStorage.getItem('diaryData');
+            if (saved) {
+                diaryData = JSON.parse(saved);
+            }
+        }
+
+        // Save diary data to localStorage
+        function saveDiaryData() {
+            localStorage.setItem('diaryData', JSON.stringify(diaryData));
+        }
+
+        // Stop camera stream
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            const videoPreview = document.getElementById('videoPreview');
+            if (videoPreview) videoPreview.srcObject = null;
+        }
+
+        // Open calendar view
+        function openCalendar() {
+            stopCamera();
+            loadDiaryData();
+            generateCalendar();
+            document.getElementById('calendarView').style.display = 'flex';
+        }
+
+        // Close calendar
+        function closeCalendar() {
+            document.getElementById('calendarView').style.display = 'none';
+            allowAccess(); // Restart camera
+        }
+
+        // Generate calendar for current month
+        function generateCalendar() {
+            const grid = document.getElementById('calendarGrid');
+            grid.innerHTML = '';
+            
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = today.getMonth();
+            
+            // Add weekday headers
+            const weekdays = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+            weekdays.forEach(day => {
+                const header = document.createElement('div');
+                header.className = 'calendar-weekday';
+                header.textContent = day;
+                grid.appendChild(header);
+            });
+            
+            // Get first day of month and number of days
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            // Add empty cells for days before month starts
+            for (let i = 0; i < firstDay; i++) {
+                const empty = document.createElement('div');
+                grid.appendChild(empty);
+            }
+            
+            // Add day cells
+            const todayDate = new Date();
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const dayCell = document.createElement('div');
+                dayCell.className = 'calendar-day';
+                dayCell.textContent = day;
+                dayCell.onclick = () => openDiaryPage(dateStr);
+                
+                // Highlight today
+                if (year === todayDate.getFullYear() && month === todayDate.getMonth() && day === todayDate.getDate()) {
+                    dayCell.style.border = '2px solid #8b6f47';
+                    dayCell.style.fontWeight = 'bold';
+                    dayCell.style.background = 'rgba(139, 111, 71, 0.1)';
+                }
+                
+                // Check if this date has entries
+                if (diaryData[dateStr] && (
+                    (diaryData[dateStr].photos && diaryData[dateStr].photos.length > 0) ||
+                    (diaryData[dateStr].texts && diaryData[dateStr].texts.length > 0) ||
+                    (diaryData[dateStr].drawing)
+                )) {
+                    dayCell.classList.add('has-photos');
+                }
+                
+                grid.appendChild(dayCell);
+            }
+        }
+
+        // Open diary page for specific date
+        function openDiaryPage(dateStr) {
+            currentDiaryDate = dateStr;
+            
+            // Close calendar
+            document.getElementById('calendarView').style.display = 'none';
+            
+            // Open diary page
+            const diaryPage = document.getElementById('diaryPage');
+            diaryPage.style.display = 'flex';
+            
+            // Set date in header
+            const dateObj = new Date(dateStr);
+            const formatted = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('diaryPageDate').textContent = formatted;
+            
+            // Initialize drawing canvas
+            initializeDrawingCanvas();
+            
+            // Load diary content
+            loadDiaryContent(dateStr);
+        }
+
+        function loadDiaryContent(dateStr) {
+            // Clear both pages
+            document.getElementById('diaryLeftPage').innerHTML = '';
+            document.getElementById('diaryRightPage').innerHTML = '';
+            
+            // Clear and load drawing
+            const canvas = document.getElementById('diaryCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            if (diaryData[dateStr]?.drawing) {
+                const img = new Image();
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0);
+                };
+                img.src = diaryData[dateStr].drawing;
+            }
+            
+            // Load photos
+            if (diaryData[dateStr]?.photos) {
+                diaryData[dateStr].photos.forEach((photoData, index) => {
+                    if (photoData) {
+                        createDraggablePhoto(photoData, index);
+                    }
+                });
+            }
+            
+            // Load text elements
+            if (diaryData[dateStr]?.texts) {
+                diaryData[dateStr].texts.forEach((textData, index) => {
+                    createDraggableText(textData.content, textData.x, textData.y, textData.page, index);
+                });
+            }
+        }
+
+        function createDraggablePhoto(photoSrc, index) {
+            const photo = document.createElement('div');
+            photo.className = 'diary-draggable-photo';
+            photo.id = `diary-photo-${index}`;
+            
+            // Get saved position or use default
+            const savedData = diaryData[currentDiaryDate]?.photoPositions?.[index];
+            const left = savedData?.x || (100 + Math.random() * 200);
+            const top = savedData?.y || (100 + Math.random() * 200);
+            const page = savedData?.page || 'left';
+            const rotation = savedData?.rotation || (Math.random() * 10 - 5);
+            
+            photo.style.left = left + 'px';
+            photo.style.top = top + 'px';
+            photo.style.transform = `rotate(${rotation}deg)`;
+            
+            photo.innerHTML = `
+                <img src="${photoSrc}" alt="Memory">
+                <button class="photo-delete-btn" onclick="deletePhotoFromDiary(${index})" title="Delete">×</button>
+            `;
+            
+            // Enable dropping stickers
+            photo.ondragover = function(event) {
+                event.preventDefault();
+            };
+            
+            photo.ondrop = function(event) {
+                event.preventDefault();
+                event.stopPropagation();
+                const sticker = event.dataTransfer.getData('text');
+                const classes = event.dataTransfer.getData('classes');
+                if (sticker) {
+                    addStickerToDiaryPhoto(photo, sticker, event.offsetX, event.offsetY, classes);
+                }
+            };
+            
+            // Restore saved stickers
+            if (diaryData[currentDiaryDate]?.photoStickers?.[index]) {
+                diaryData[currentDiaryDate].photoStickers[index].forEach(s => {
+                    // Ensure numeric coordinates
+                    let x = parseFloat(s.x);
+                    let y = parseFloat(s.y);
+                    if (isNaN(x)) x = 50;
+                    if (isNaN(y)) y = 50;
+                    addStickerToDiaryPhoto(photo, s.text, x, y, s.classes);
+                });
+            }
+            
+            // Make draggable
+            makeDraggable(photo);
+            
+            // Add to appropriate page
+            const container = page === 'left' ? 
+                document.getElementById('diaryLeftPage') : 
+                document.getElementById('diaryRightPage');
+            container.appendChild(photo);
+        }
+
+        function addStickerToDiaryPhoto(photo, stickerText, x, y, stickerClasses) {
+            const stickerElement = document.createElement('div');
+            stickerElement.className = 'diary-sticker ' + (stickerClasses || '');
+            stickerElement.textContent = stickerText;
+            stickerElement.style.position = 'absolute';
+            stickerElement.style.left = x + 'px';
+            stickerElement.style.top = y + 'px';
+            stickerElement.style.zIndex = 20;
+            stickerElement.style.cursor = 'move';
+            stickerElement.style.fontSize = '32px';
+            stickerElement.style.userSelect = 'none';
+            
+            let isDragging = false;
+            let offsetX, offsetY;
+            
+            stickerElement.onmousedown = function(e) {
+                isDragging = true;
+                offsetX = e.offsetX;
+                offsetY = e.offsetY;
+                e.stopPropagation();
+            };
+            
+            photo.addEventListener('mousemove', function(e) {
+                if (isDragging) {
+                    stickerElement.style.left = (e.offsetX - offsetX) + 'px';
+                    stickerElement.style.top = (e.offsetY - offsetY) + 'px';
+                }
+            });
+            
+            window.addEventListener('mouseup', function() {
+                isDragging = false;
+            });
+            
+            stickerElement.ondblclick = function() {
+                stickerElement.remove();
+            };
+            
+            photo.appendChild(stickerElement);
+        }
+
+        function createDraggableText(content, x, y, page, index) {
+            const textArea = document.createElement('textarea');
+            textArea.className = 'diary-text-input';
+            textArea.id = `diary-text-${index}`;
+            textArea.value = content || '';
+            textArea.placeholder = 'write something...';
+            textArea.style.left = x + 'px';
+            textArea.style.top = y + 'px';
+            textArea.style.width = '250px';
+            textArea.style.height = 'auto';
+            
+            // Auto resize
+            textArea.addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = this.scrollHeight + 'px';
+            });
+            
+            // Make draggable
+            makeDraggable(textArea);
+            
+            // Add to appropriate page
+            const container = page === 'left' ? 
+                document.getElementById('diaryLeftPage') : 
+                document.getElementById('diaryRightPage');
+            container.appendChild(textArea);
+            
+            // Trigger resize
+            textArea.dispatchEvent(new Event('input'));
+        }
+
+        function makeDraggable(element) {
+            let isDragging = false;
+            let startX, startY, initialX, initialY;
+            
+            element.addEventListener('mousedown', function(e) {
+                if (e.target.classList.contains('photo-delete-btn')) return;
+                if (e.target.tagName === 'TEXTAREA' && !e.shiftKey) return; // Allow text editing
+                
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                const rect = element.getBoundingClientRect();
+                const parent = element.parentElement.getBoundingClientRect();
+                initialX = rect.left - parent.left;
+                initialY = rect.top - parent.top;
+                
+                element.style.zIndex = '15';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                element.style.left = (initialX + dx) + 'px';
+                element.style.top = (initialY + dy) + 'px';
+            });
+            
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    element.style.zIndex = '';
+                }
+            });
+        }
+
+        // Back to calendar
+        function backToCalendar() {
+            // Save before leaving
+            saveDiaryPage();
+            document.getElementById('diaryPage').style.display = 'none';
+            openCalendar();
+        }
+
+        // Add existing photo to diary
+        function addExistingPhotoToDiary() {
+            if (!diaryData[currentDiaryDate]) {
+                diaryData[currentDiaryDate] = { photos: [], texts: [], photoPositions: [] };
+            }
+            
+            // Get all available photos from the infinite canvas
+            const allPhotos = [];
+            document.querySelectorAll('.polaroid-photo').forEach(photo => {
+                const img = photo.querySelector('img');
+                if (img && img.src) {
+                    allPhotos.push(img.src);
+                }
+            });
+            
+            if (allPhotos.length === 0) {
+                alert('no photos available! take some photos first 📸');
+                return;
+            }
+            
+            // Add the last photo (most recent)
+            const newPhoto = allPhotos[allPhotos.length - 1];
+            
+            // Check if photo already exists in this diary page
+            if (diaryData[currentDiaryDate].photos && 
+                diaryData[currentDiaryDate].photos.includes(newPhoto)) {
+                alert('this photo is already on this page!');
+                return;
+            }
+            
+            if (!diaryData[currentDiaryDate].photos) {
+                diaryData[currentDiaryDate].photos = [];
+            }
+            
+            diaryData[currentDiaryDate].photos.push(newPhoto);
+            const index = diaryData[currentDiaryDate].photos.length - 1;
+            
+            createDraggablePhoto(newPhoto, index);
+        }
+
+        // Delete photo from diary
+        function deletePhotoFromDiary(index) {
+            if (confirm('delete this photo from your diary?')) {
+                // Remove from data
+                if (diaryData[currentDiaryDate] && diaryData[currentDiaryDate].photos) {
+                    diaryData[currentDiaryDate].photos.splice(index, 1);
+                    if (diaryData[currentDiaryDate].photoPositions) {
+                        diaryData[currentDiaryDate].photoPositions.splice(index, 1);
+                    }
+                }
+                
+                // Remove from DOM
+                const photoElement = document.getElementById(`diary-photo-${index}`);
+                if (photoElement) {
+                    photoElement.remove();
+                }
+                
+                // Reload to fix indices
+                loadDiaryContent(currentDiaryDate);
+                
+                // Save
+                saveDiaryPage();
+            }
+        }
+
+        // Add text to diary
+        function addTextToDiary() {
+            if (!diaryData[currentDiaryDate]) {
+                diaryData[currentDiaryDate] = { photos: [], texts: [], photoPositions: [] };
+            }
+            
+            if (!diaryData[currentDiaryDate].texts) {
+                diaryData[currentDiaryDate].texts = [];
+            }
+            
+            const newText = {
+                content: '',
+                x: 100,
+                y: 100,
+                page: 'left'
+            };
+            
+            diaryData[currentDiaryDate].texts.push(newText);
+            const index = diaryData[currentDiaryDate].texts.length - 1;
+            
+            createDraggableText('', 100, 100, 'left', index);
+        }
+
+        // Navigate to previous date
+        function navigateToPrevDate() {
+            if (!currentDiaryDate) return;
+            saveDiaryPage();
+            
+            const current = new Date(currentDiaryDate);
+            current.setDate(current.getDate() - 1);
+            const prevDate = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+            openDiaryPage(prevDate);
+        }
+
+        // Navigate to next date
+        function navigateToNextDate() {
+            if (!currentDiaryDate) return;
+            saveDiaryPage();
+            
+            const current = new Date(currentDiaryDate);
+            current.setDate(current.getDate() + 1);
+            const nextDate = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
+            openDiaryPage(nextDate);
+        }
+
+        // Initialize drawing canvas
+        function initializeDrawingCanvas() {
+            drawingCanvas = document.getElementById('diaryCanvas');
+            drawingContext = drawingCanvas.getContext('2d');
+            
+            // Set canvas size to match container
+            const container = document.querySelector('.diary-page-content');
+            drawingCanvas.width = container.offsetWidth;
+            drawingCanvas.height = container.offsetHeight;
+            
+            // Set drawing properties
+            drawingContext.lineWidth = penSize;
+            drawingContext.lineCap = 'round';
+            drawingContext.lineJoin = 'round';
+            drawingContext.strokeStyle = currentColor;
+            
+            // Drawing events (only work when in drawing mode)
+            drawingCanvas.onmousedown = startDrawing;
+            drawingCanvas.onmousemove = draw;
+            drawingCanvas.onmouseup = stopDrawing;
+            drawingCanvas.onmouseleave = stopDrawing;
+        }
+
+        // Toggle drawing mode
+        let isDrawingMode = false;
+        function toggleDrawingMode() {
+            isDrawingMode = !isDrawingMode;
+            const canvas = document.getElementById('diaryCanvas');
+            const btn = document.getElementById('drawModeBtn');
+            
+            if (isDrawingMode) {
+                canvas.classList.add('drawing-mode');
+                btn.style.background = 'rgba(139, 111, 71, 0.3)';
+                btn.textContent = '✏️ drawing...';
+            } else {
+                canvas.classList.remove('drawing-mode');
+                btn.style.background = '';
+                btn.textContent = '✏️ draw';
+            }
+        }
+
+        function startDrawing(e) {
+            if (!isDrawingMode) return;
+            
+            isDrawing = true;
+            const rect = drawingCanvas.getBoundingClientRect();
+            drawingContext.beginPath();
+            drawingContext.moveTo(e.clientX - rect.left, e.clientY - rect.top);
+        }
+
+        function draw(e) {
+            if (!isDrawing || !isDrawingMode) return;
+            
+            const rect = drawingCanvas.getBoundingClientRect();
+            
+            if (isEraser) {
+                drawingContext.globalCompositeOperation = 'destination-out';
+                drawingContext.lineWidth = penSize * 3;
+            } else {
+                drawingContext.globalCompositeOperation = 'source-over';
+                drawingContext.lineWidth = penSize;
+                drawingContext.strokeStyle = currentColor;
+            }
+            
+            drawingContext.lineTo(e.clientX - rect.left, e.clientY - rect.top);
+            drawingContext.stroke();
+        }
+
+        function stopDrawing() {
+            isDrawing = false;
+        }
+
+        function setDrawingColor(color) {
+            currentColor = color;
+            isEraser = false;
+            document.getElementById('eraserBtn').textContent = '🧹 eraser';
+            
+            // Update color picker value if set programmatically
+            const picker = document.getElementById('drawingColorPicker');
+            if (picker && picker.value !== color) {
+                // Check if valid hex
+                if (/^#[0-9A-F]{6}$/i.test(color)) {
+                    picker.value = color;
+                }
+            }
+        }
+        
+        function updatePenSize(size) {
+            penSize = parseInt(size);
+        }
+
+        function toggleEraser() {
+            isEraser = !isEraser;
+            const btn = document.getElementById('eraserBtn');
+            if (isEraser) {
+                btn.textContent = '✏️ draw';
+                btn.style.background = 'rgba(139, 111, 71, 0.3)';
+            } else {
+                btn.textContent = '🧹 eraser';
+                btn.style.background = '';
+            }
+        }
+
+        function clearDrawing() {
+            drawingContext.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
+            
+            // Also clear all photos on the page
+            document.querySelectorAll('.diary-draggable-photo').forEach(photo => photo.remove());
+            
+            // Also clear all text entries
+            document.querySelectorAll('.diary-text-input').forEach(input => input.remove());
+        }
+
+        // Save diary page
+        function saveDiaryPage() {
+            if (!currentDiaryDate) return;
+            
+            // Initialize diary entry if doesn't exist
+            if (!diaryData[currentDiaryDate]) {
+                diaryData[currentDiaryDate] = {
+                    photos: [],
+                    photoPositions: [],
+                    texts: [],
+                    drawing: ''
+                };
+            }
+            
+            // Save photo positions
+            diaryData[currentDiaryDate].photoPositions = [];
+            diaryData[currentDiaryDate].photoStickers = {};
+            
+            document.querySelectorAll('.diary-draggable-photo').forEach((photo) => {
+                // Extract index from ID to preserve links with infinite canvas
+                const idParts = photo.id.split('-');
+                const index = parseInt(idParts[idParts.length - 1]);
+                
+                if (isNaN(index)) return;
+
+                const parent = photo.parentElement;
+                const page = parent.id === 'diaryLeftPage' ? 'left' : 'right';
+                const transform = photo.style.transform;
+                const rotation = transform ? parseFloat(transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] || 0) : 0;
+                
+                diaryData[currentDiaryDate].photoPositions[index] = {
+                    x: parseFloat(photo.style.left) || 0,
+                    y: parseFloat(photo.style.top) || 0,
+                    page: page,
+                    rotation: rotation
+                };
+                
+                // Save stickers
+                const stickers = [];
+                photo.querySelectorAll('.diary-sticker').forEach(s => {
+                    stickers.push({
+                        text: s.textContent,
+                        x: s.style.left,
+                        y: s.style.top,
+                        classes: s.className.replace('diary-sticker ', '')
+                    });
+                });
+                if (stickers.length > 0) {
+                     diaryData[currentDiaryDate].photoStickers[index] = stickers;
+                }
+            });
+            
+            // Save text content and positions
+            diaryData[currentDiaryDate].texts = [];
+            document.querySelectorAll('.diary-text-input').forEach((textarea) => {
+                const parent = textarea.parentElement;
+                const page = parent.id === 'diaryLeftPage' ? 'left' : 'right';
+                
+                if (textarea.value.trim()) { // Only save non-empty texts
+                    diaryData[currentDiaryDate].texts.push({
+                        content: textarea.value,
+                        x: parseFloat(textarea.style.left) || 0,
+                        y: parseFloat(textarea.style.top) || 0,
+                        page: page
+                    });
+                }
+            });
+            
+            // Save drawing
+            if (drawingCanvas) {
+                diaryData[currentDiaryDate].drawing = drawingCanvas.toDataURL();
+            }
+            
+            // Save to localStorage
+            saveDiaryData();
+            
+            showMessage('💾 diary saved!');
+        }
+
+        // Initialize diary data on page load
+        loadDiaryData();
+    </script>
+
+    <style>
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+            to {
+                opacity: 0;
+                transform: translateX(400px);
+            }
+        }
+    </style>
+</body>
+</html>
