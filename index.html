@@ -14,6 +14,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     
+    <!-- Cloudinary Upload Widget -->
+    <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
+    
     <style>
         * {
             margin: 0;
@@ -626,6 +629,33 @@
             letter-spacing: 0.5px;
             color: #8b6f47;
             filter: drop-shadow(0 1px 3px rgba(139, 111, 71, 0.2));
+        }
+
+        /* Username Tags */
+        .user-tag {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(139, 111, 71, 0.9);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-family: 'Indie Flower', cursive;
+            font-size: 14px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .polaroid:hover .user-tag,
+        .diary-draggable-photo:hover .user-tag,
+        .diary-text-input:hover + .user-tag,
+        .sticker:hover .user-tag {
+            opacity: 1;
         }
 
         /* Notification Modal */
@@ -1452,6 +1482,19 @@
 
     <!-- Calendar/Diary View -->
     <!-- Share Canvas Dialog -->
+    <div class="notification-overlay" id="usernameDialog" style="display: none; z-index: 2000;">
+        <div class="retro-dialog" style="max-width: 400px;">
+            <div class="dialog-header">
+                <h2 class="dialog-title">who are you? 🤔</h2>
+            </div>
+            <div class="dialog-content">
+                <p class="dialog-submessage">enter a name so friends know it's you!</p>
+                <input type="text" id="usernameInput" class="notes-textarea" placeholder="your name..." style="min-height: 50px; font-size: 24px; text-align: center; padding: 10px; margin-bottom: 20px;">
+                <button class="retro-button primary" onclick="saveUsername()" style="width: 100%;">start sharing ✨</button>
+            </div>
+        </div>
+    </div>
+
     <div class="notification-overlay" id="shareDialog" style="display: none;">
         <div class="retro-dialog" style="max-width: 500px;">
             <div class="dialog-header">
@@ -1507,7 +1550,11 @@
     <div class="notification-overlay" id="calendarView" style="display: none;">
         <div class="diary-container">
             <div class="diary-header">
-                <h2 class="diary-title">📅 memory diary</h2>
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <button class="nav-arrow-btn" onclick="previousMonth()" style="width: 40px; height: 40px;">←</button>
+                    <h2 class="diary-title" id="calendarMonthYear">📅 memory diary</h2>
+                    <button class="nav-arrow-btn" onclick="nextMonth()" style="width: 40px; height: 40px;">→</button>
+                </div>
                 <button class="close-diary-btn" onclick="closeCalendar()">✕</button>
             </div>
             <div class="calendar-grid" id="calendarGrid">
@@ -1692,6 +1739,16 @@
         let polaroidDragOffsetX = 0;
         let polaroidDragOffsetY = 0;
 
+        // Cloudinary Configuration
+        // SETUP INSTRUCTIONS:
+        // 1. Sign up at https://cloudinary.com (free tier available)
+        // 2. Go to Settings > Upload > Add upload preset
+        // 3. Set signing mode to "Unsigned"
+        // 4. Replace YOUR_CLOUD_NAME and YOUR_UPLOAD_PRESET below
+        const CLOUDINARY_CLOUD_NAME = "YOUR_CLOUD_NAME";
+        const CLOUDINARY_UPLOAD_PRESET = "YOUR_UPLOAD_PRESET";
+        const USE_CLOUDINARY = false; // Set to true after adding credentials above
+        
         // Firebase Configuration
         // NOTE: Replace these with your own Firebase project credentials
         // Get them from: https://console.firebase.google.com/
@@ -1709,6 +1766,7 @@
         let firebaseApp, database, currentRoomRef;
         let currentRoomId = null;
         let isFirebaseEnabled = false;
+        let currentUsername = localStorage.getItem('memory_camera_username') || '';
 
         try {
             firebaseApp = firebase.initializeApp(firebaseConfig);
@@ -1738,6 +1796,38 @@
             document.getElementById('shareDialog').style.display = 'none';
         }
 
+        function checkUsername() {
+            if (!currentUsername) {
+                document.getElementById('shareDialog').style.display = 'none';
+                document.getElementById('usernameDialog').style.display = 'flex';
+                return false;
+            }
+            return true;
+        }
+
+        function saveUsername() {
+            const name = document.getElementById('usernameInput').value.trim();
+            if (!name) {
+                alert('Please enter a name!');
+                return;
+            }
+            currentUsername = name;
+            localStorage.setItem('memory_camera_username', currentUsername);
+            document.getElementById('usernameDialog').style.display = 'none';
+            
+            // Handle pending actions
+            if (window.pendingRoomJoin) {
+                autoJoinRoom(window.pendingRoomJoin);
+                window.pendingRoomJoin = null;
+            } else if (document.getElementById('shareDialog').style.display === 'none' && !currentRoomId) {
+                 // If we were trying to share (which triggered this dialog), re-open share logic
+                 // Since we can't easily know exactly which button was clicked (share vs join),
+                 // we'll just assume if the share dialog isn't open, we probably want to open it or start sharing.
+                 // Actually, better UX: just open the share dialog now that we have a username.
+                 openShareDialog();
+            }
+        }
+
         function generateRoomCode() {
             return Math.random().toString(36).substring(2, 8).toUpperCase();
         }
@@ -1747,6 +1837,8 @@
                 alert('⚠️ Firebase not configured. Please add your Firebase credentials to enable sharing.');
                 return;
             }
+
+            if (!checkUsername()) return;
 
             // If already in a room, just show the link
             if (currentRoomId) {
@@ -1761,10 +1853,41 @@
             currentRoomId = roomId;
             currentRoomRef = database.ref('rooms/' + roomId);
 
+            // Upload CURRENT canvas state to the new room
+            const polaroids = [];
+            document.querySelectorAll('#infiniteCanvas .polaroid').forEach(el => {
+                const img = el.querySelector('img');
+                const id = el.id;
+                const x = parseFloat(el.style.left);
+                const y = parseFloat(el.style.top);
+                const transform = el.style.transform;
+                const rotation = transform ? parseFloat(transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] || 0) : 0;
+                const date = el.dataset.diaryDate;
+                const index = el.dataset.diaryIndex;
+                
+                polaroids.push({
+                    id: id,
+                    imageUrl: img.src,
+                    x: x,
+                    y: y,
+                    rotation: rotation,
+                    diaryDate: date,
+                    diaryIndex: index,
+                    username: currentUsername, // Claim ownership of existing local items
+                    timestamp: Date.now()
+                });
+            });
+
             // Initialize room with current canvas state
             await currentRoomRef.set({
                 createdAt: Date.now(),
-                polaroids: []
+                creator: currentUsername,
+                polaroids: {} // Will be populated individually to allow keys
+            });
+            
+            // Push all existing polaroids
+            polaroids.forEach(p => {
+                currentRoomRef.child('polaroids').push(p);
             });
 
             // Listen for changes
@@ -1789,24 +1912,78 @@
 
             // Listen for new polaroids
             currentRoomRef.child('polaroids').on('child_added', (snapshot) => {
-                // This will fire for existing and new polaroids
-                // We handle loading existing ones in getShareLink
+                const data = snapshot.val();
+                const key = snapshot.key;
+                
+                // Check if already exists to avoid duplicates
+                // (Though usually child_added handles this, if we pre-loaded we need to be careful. 
+                // Since we're going to remove pre-loading, this is fine.)
+                if (document.getElementById(data.id || key)) return; // Use provided ID or firebase key
+                
+                // Add to canvas
+                addPolaroidToCanvas(data.imageUrl, data.diaryDate, data.diaryIndex, data.username, data.id);
+                
+                // Position it
+                const polaroid = document.getElementById(data.id);
+                if (polaroid) {
+                    polaroid.style.left = data.x + 'px';
+                    polaroid.style.top = data.y + 'px';
+                    polaroid.style.transform = `rotate(${data.rotation}deg)`;
+                }
+
+                // Save to local diary if it's not there (persists friend's photos)
+                if (data.diaryDate && data.imageUrl) {
+                    // Ensure date entry exists
+                    if (!diaryData[data.diaryDate]) {
+                        diaryData[data.diaryDate] = {
+                            photos: [],
+                            notes: '',
+                            drawing: ''
+                        };
+                    }
+                    
+                    if (!diaryData[data.diaryDate].photos) {
+                        diaryData[data.diaryDate].photos = [];
+                    }
+                    
+                    // Check if photo already exists to prevent duplicates
+                    if (!diaryData[data.diaryDate].photos.includes(data.imageUrl)) {
+                        diaryData[data.diaryDate].photos.push(data.imageUrl);
+                        saveDiaryData(); // Save to localStorage
+                        
+                        // If we are currently viewing this date in the diary, update the view!
+                        if (currentDiaryDate === data.diaryDate && document.getElementById('diaryPage').style.display !== 'none') {
+                            const index = diaryData[data.diaryDate].photos.length - 1;
+                            createDraggablePhoto(data.imageUrl, index);
+                        }
+                    }
+                }
             });
         }
 
-        function syncPolaroidToRoom(imageUrl, x, y, rotation, diaryDate, diaryIndex) {
+        function syncPolaroidToRoom(imageUrl, x, y, rotation, diaryDate, diaryIndex, id) {
             if (!currentRoomRef) return;
 
             const polaroidData = {
+                id,
                 imageUrl,
                 x,
                 y,
                 rotation,
                 diaryDate,
                 diaryIndex,
+                username: currentUsername,
                 timestamp: Date.now()
             };
-
+            
+            // Use the ID as the key if possible, or push with ID in data
+            // Push generates a new key. If we want to use our ID as key:
+            // currentRoomRef.child('polaroids').child(id).set(polaroidData);
+            // But setupRoomListeners uses child_added on 'polaroids'.
+            // If we use .child(id).set(), child_added still fires.
+            // This prevents duplicates if we re-sync or if we use the ID as the key.
+            // Let's use push() for now but include the ID in the data, as setupRoomListeners checks for data.id.
+            
             currentRoomRef.child('polaroids').push(polaroidData);
         }
 
@@ -1892,6 +2069,19 @@
         async function autoJoinRoom(roomCode) {
             if (!isFirebaseEnabled) return;
 
+            // Check username before joining
+            if (!checkUsername()) {
+                // Save intended room to join after username is set
+                window.pendingRoomJoin = roomCode;
+                // Override saveUsername to handle the pending join
+                const originalSave = window.saveUsername; // Backup original if needed or just use logic in saveUsername
+                // Actually, I modified saveUsername to handle pending actions generically if possible, 
+                // but let's just rely on the user hitting "Start Sharing" which calls saveUsername.
+                // We need saveUsername to know it should call autoJoinRoom again.
+                // I'll update saveUsername logic below.
+                return;
+            }
+
             roomCode = roomCode.toUpperCase();
 
             // Check if room exists
@@ -1906,26 +2096,11 @@
             currentRoomId = roomCode;
             currentRoomRef = roomRef;
 
-            // Load existing polaroids from room
-            const roomData = snapshot.val();
-            if (roomData.polaroids) {
-                // Clear current canvas
-                document.getElementById('infiniteCanvas').innerHTML = '';
-                polaroidCounter = 0;
+            // Clear current canvas before loading room state
+            document.getElementById('infiniteCanvas').innerHTML = '';
+            polaroidCounter = 0;
 
-                // Load shared polaroids
-                Object.values(roomData.polaroids).forEach(polaroidData => {
-                    addPolaroidToCanvas(polaroidData.imageUrl, polaroidData.diaryDate, polaroidData.diaryIndex);
-                    const polaroid = document.querySelector(`#infiniteCanvas .polaroid:last-child`);
-                    if (polaroid) {
-                        polaroid.style.left = polaroidData.x + 'px';
-                        polaroid.style.top = polaroidData.y + 'px';
-                        polaroid.style.transform = `rotate(${polaroidData.rotation}deg)`;
-                    }
-                });
-            }
-
-            // Listen for new changes
+            // Listen for changes (and initial load)
             setupRoomListeners();
 
             showMessage(`🚪 Joined shared canvas: ${roomCode}`);
@@ -1936,6 +2111,8 @@
                 alert('⚠️ Firebase not configured. Please add your Firebase credentials to enable sharing.');
                 return;
             }
+
+            if (!checkUsername()) return;
 
             let input = document.getElementById('friendLinkInput').value.trim();
             if (!input) {
@@ -1967,26 +2144,11 @@
             currentRoomId = roomCode;
             currentRoomRef = roomRef;
 
-            // Load existing polaroids from room
-            const roomData = snapshot.val();
-            if (roomData.polaroids) {
-                // Clear current canvas
-                document.getElementById('infiniteCanvas').innerHTML = '';
-                polaroidCounter = 0;
+            // Clear current canvas before loading room state
+            document.getElementById('infiniteCanvas').innerHTML = '';
+            polaroidCounter = 0;
 
-                // Load shared polaroids
-                Object.values(roomData.polaroids).forEach(polaroidData => {
-                    addPolaroidToCanvas(polaroidData.imageUrl, polaroidData.diaryDate, polaroidData.diaryIndex);
-                    const polaroid = document.querySelector(`#infiniteCanvas .polaroid:last-child`);
-                    if (polaroid) {
-                        polaroid.style.left = polaroidData.x + 'px';
-                        polaroid.style.top = polaroidData.y + 'px';
-                        polaroid.style.transform = `rotate(${polaroidData.rotation}deg)`;
-                    }
-                });
-            }
-
-            // Listen for new changes
+            // Listen for changes (and initial load)
             setupRoomListeners();
 
             // Update UI
@@ -2066,9 +2228,53 @@
         // No view switching needed - everything is on one page
 
         // Camera stays on since we're always on the same page
+        
+        // Upload image to Cloudinary
+        async function uploadToCloudinary(imageDataUrl) {
+            if (!USE_CLOUDINARY || CLOUDINARY_CLOUD_NAME === "YOUR_CLOUD_NAME") {
+                // Cloudinary not configured, return base64
+                return imageDataUrl;
+            }
+            
+            try {
+                showMessage('☁️ Uploading to cloud...');
+                
+                // Convert data URL to blob
+                const response = await fetch(imageDataUrl);
+                const blob = await response.blob();
+                
+                // Create form data
+                const formData = new FormData();
+                formData.append('file', blob);
+                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                formData.append('cloud_name', CLOUDINARY_CLOUD_NAME);
+                
+                // Upload to Cloudinary
+                const uploadResponse = await fetch(
+                    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+                    {
+                        method: 'POST',
+                        body: formData
+                    }
+                );
+                
+                const data = await uploadResponse.json();
+                
+                if (data.secure_url) {
+                    showMessage('✅ Photo saved to cloud!');
+                    return data.secure_url;
+                } else {
+                    throw new Error('Upload failed');
+                }
+            } catch (error) {
+                console.error('Cloudinary upload error:', error);
+                showMessage('⚠️ Cloud upload failed, saving locally');
+                return imageDataUrl; // Fallback to base64
+            }
+        }
 
         // Take photo
-        function takePhoto() {
+        async function takePhoto() {
             const video = document.getElementById('videoPreview');
             const canvas = document.getElementById('photoCanvas');
             const context = canvas.getContext('2d');
@@ -2103,6 +2309,9 @@
             // Get image data
             const imageDataUrl = canvas.toDataURL('image/png');
             
+            // Upload to Cloudinary (or use base64 if not configured)
+            const photoUrl = await uploadToCloudinary(imageDataUrl);
+            
             // Save to diary
             let targetDateStr;
             
@@ -2129,22 +2338,19 @@
                 diaryData[targetDateStr].photos = [];
             }
             
-            // Add photo to diary data
-            diaryData[targetDateStr].photos.push(imageDataUrl);
+            // Add photo URL to diary data (Cloudinary URL or base64)
+            diaryData[targetDateStr].photos.push(photoUrl);
             const photoIndex = diaryData[targetDateStr].photos.length - 1;
             
             // Add to infinite canvas as Polaroid, linking to diary
-            addPolaroidToCanvas(imageDataUrl, targetDateStr, photoIndex);
+            const newPolaroid = addPolaroidToCanvas(photoUrl, targetDateStr, photoIndex, currentUsername);
             
             // Sync to shared room if active
-            if (currentRoomId) {
-                const lastPolaroid = document.querySelector('#infiniteCanvas .polaroid:last-child');
-                if (lastPolaroid) {
-                    const x = parseFloat(lastPolaroid.style.left) || 0;
-                    const y = parseFloat(lastPolaroid.style.top) || 0;
-                    const rotation = parseFloat(lastPolaroid.style.transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] || 0);
-                    syncPolaroidToRoom(imageDataUrl, x, y, rotation, targetDateStr, photoIndex);
-                }
+            if (currentRoomId && newPolaroid) {
+                const x = parseFloat(newPolaroid.style.left) || 0;
+                const y = parseFloat(newPolaroid.style.top) || 0;
+                const rotation = parseFloat(newPolaroid.style.transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] || 0);
+                syncPolaroidToRoom(photoUrl, x, y, rotation, targetDateStr, photoIndex, newPolaroid.id);
             }
             
             // If we are currently viewing this date, add it to the page immediately
@@ -2227,11 +2433,11 @@
         }
 
         // Add Polaroid to infinite canvas
-        function addPolaroidToCanvas(imageDataUrl, diaryDate = null, diaryIndex = null) {
+        function addPolaroidToCanvas(imageDataUrl, diaryDate = null, diaryIndex = null, username = null, existingId = null) {
             const canvas = document.getElementById('infiniteCanvas');
             const polaroid = document.createElement('div');
             polaroid.className = 'polaroid';
-            polaroid.id = 'polaroid-' + Date.now();
+            polaroid.id = existingId || ('polaroid-' + Date.now() + '-' + Math.floor(Math.random() * 1000));
             
             if (diaryDate && diaryIndex !== null) {
                 polaroid.dataset.diaryDate = diaryDate;
@@ -2263,6 +2469,17 @@
             polaroid.appendChild(img);
             polaroid.appendChild(buttons);
             
+            // Add username tag if provided
+            if (username) {
+                const userTag = document.createElement('div');
+                userTag.className = 'user-tag';
+                userTag.textContent = username;
+                polaroid.appendChild(userTag);
+                
+                // If it's someone else's photo, maybe style it slightly differently or disable delete?
+                // For now we keep full access but visual distinction is key
+            }
+            
             // Make Polaroid draggable
             polaroid.onmousedown = function(e) {
                 if (e.target.classList.contains('polaroid-btn')) return;
@@ -2288,6 +2505,8 @@
             
             canvas.appendChild(polaroid);
             polaroidCounter++;
+            
+            return polaroid;
         }
 
         // Drag and drop functions
@@ -3047,6 +3266,10 @@
         let currentColor = '#000000';
         let penSize = 3;
         let isEraser = false;
+        
+        // Calendar navigation
+        let currentCalendarYear = new Date().getFullYear();
+        let currentCalendarMonth = new Date().getMonth();
 
         // Load diary data from localStorage
         function loadDiaryData() {
@@ -3085,14 +3308,38 @@
             allowAccess(); // Restart camera
         }
 
+        // Navigate to previous month
+        function previousMonth() {
+            currentCalendarMonth--;
+            if (currentCalendarMonth < 0) {
+                currentCalendarMonth = 11;
+                currentCalendarYear--;
+            }
+            generateCalendar();
+        }
+        
+        // Navigate to next month
+        function nextMonth() {
+            currentCalendarMonth++;
+            if (currentCalendarMonth > 11) {
+                currentCalendarMonth = 0;
+                currentCalendarYear++;
+            }
+            generateCalendar();
+        }
+        
         // Generate calendar for current month
         function generateCalendar() {
             const grid = document.getElementById('calendarGrid');
             grid.innerHTML = '';
             
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = today.getMonth();
+            const year = currentCalendarYear;
+            const month = currentCalendarMonth;
+            
+            // Update month/year display
+            const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                              'july', 'august', 'september', 'october', 'november', 'december'];
+            document.getElementById('calendarMonthYear').textContent = `${monthNames[month]} ${year}`;
             
             // Add weekday headers
             const weekdays = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
