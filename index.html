@@ -637,25 +637,69 @@
             top: -25px;
             left: 50%;
             transform: translateX(-50%);
-            background: rgba(139, 111, 71, 0.9);
+            background: rgba(139, 111, 71, 0.95);
             color: white;
-            padding: 2px 8px;
-            border-radius: 10px;
+            padding: 4px 10px;
+            border-radius: 12px;
             font-family: 'Indie Flower', cursive;
             font-size: 14px;
+            font-weight: 600;
             white-space: nowrap;
             pointer-events: none;
             z-index: 100;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            opacity: 1;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
         }
 
-        .polaroid:hover .user-tag,
-        .diary-draggable-photo:hover .user-tag,
-        .diary-text-input:hover + .user-tag,
-        .sticker:hover .user-tag {
+        /* My own items have subtle tags */
+        .user-tag.own-item {
+            background: rgba(139, 111, 71, 0.6);
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .polaroid:hover .user-tag.own-item,
+        .diary-draggable-photo:hover .user-tag.own-item {
             opacity: 1;
+        }
+
+        /* Friends Online Panel */
+        .friends-online {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 252, 245, 0.98);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 20px rgba(139, 111, 71, 0.2);
+            z-index: 50;
+            min-width: 150px;
+            border: 2px solid rgba(139, 111, 71, 0.2);
+        }
+
+        .friends-online h3 {
+            font-family: 'Caveat', cursive;
+            font-size: 20px;
+            color: #6b5435;
+            margin: 0 0 10px 0;
+            font-weight: 600;
+        }
+
+        .friend-item {
+            font-family: 'Indie Flower', cursive;
+            font-size: 16px;
+            color: #8b6f47;
+            padding: 4px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .friend-item::before {
+            content: '🟢';
+            font-size: 10px;
         }
 
         /* Notification Modal */
@@ -1405,6 +1449,11 @@
     <div class="decor-element decor-9">🥤</div>
     <div class="decor-element decor-10">🍰</div>
 
+    <!-- Active Users List -->
+    <div id="activeUsersList" style="position: fixed; top: 20px; left: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px;">
+        <!-- Users will be added here dynamically -->
+    </div>
+
     <!-- Title -->
     <h1 class="title">memory camera</h1>
 
@@ -1481,6 +1530,43 @@
     </div>
 
     <!-- Calendar/Diary View -->
+    <!-- Setup Required Modal -->
+    <div class="notification-overlay" id="setupDialog" style="display: none; z-index: 3000;">
+        <div class="retro-dialog" style="max-width: 550px; border: 4px solid #ff6b6b;">
+            <div class="dialog-header">
+                <h2 class="dialog-title" style="color: #ff6b6b;">⚠️ setup required</h2>
+            </div>
+            <div class="dialog-content" style="text-align: left;">
+                <p class="dialog-message" style="font-weight: bold;">The app is not connected to the cloud yet!</p>
+                <p class="dialog-submessage">To share with friends, you need to add your own API keys in the code.</p>
+                
+                <div style="background: rgba(255,0,0,0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <h3 style="font-family: 'Caveat'; font-size: 24px; margin-bottom: 10px;">1. Firebase (for Realtime Sharing)</h3>
+                    <ul style="font-family: 'Indie Flower'; list-style: none; padding: 0;">
+                        <li id="check-firebase-api" style="color: #ff6b6b;">❌ API Key missing</li>
+                        <li id="check-firebase-id" style="color: #ff6b6b;">❌ Project ID missing</li>
+                    </ul>
+                </div>
+
+                <div style="background: rgba(0,0,255,0.05); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <h3 style="font-family: 'Caveat'; font-size: 24px; margin-bottom: 10px;">2. Cloudinary (for Photo Storage)</h3>
+                    <ul style="font-family: 'Indie Flower'; list-style: none; padding: 0;">
+                        <li id="check-cloudinary-name" style="color: #ff6b6b;">❌ Cloud Name missing</li>
+                        <li id="check-cloudinary-preset" style="color: #ff6b6b;">❌ Upload Preset missing</li>
+                    </ul>
+                </div>
+
+                <p class="dialog-submessage" style="font-size: 14px;">
+                    👉 Open <b>index.html</b> and look for "YOUR_API_KEY" to paste your keys.
+                    <br>
+                    (See CLOUDINARY_SETUP.md for help)
+                </p>
+                
+                <button class="retro-button primary" onclick="document.getElementById('setupDialog').style.display='none'">i'll fix it!</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Share Canvas Dialog -->
     <div class="notification-overlay" id="usernameDialog" style="display: none; z-index: 2000;">
         <div class="retro-dialog" style="max-width: 400px;">
@@ -1616,6 +1702,12 @@
         </div>
     </div>
 
+    <!-- Friends Online Panel -->
+    <div class="friends-online" id="friendsOnline" style="display: none;">
+        <h3>👥 online</h3>
+        <div id="friendsList"></div>
+    </div>
+
     <!-- Infinite Canvas (Background Layer) -->
     <div class="infinite-canvas-section" id="canvasSection" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1;">
         <div class="infinite-canvas" id="infiniteCanvas">
@@ -1745,21 +1837,22 @@
         // 2. Go to Settings > Upload > Add upload preset
         // 3. Set signing mode to "Unsigned"
         // 4. Replace YOUR_CLOUD_NAME and YOUR_UPLOAD_PRESET below
-        const CLOUDINARY_CLOUD_NAME = "YOUR_CLOUD_NAME";
-        const CLOUDINARY_UPLOAD_PRESET = "YOUR_UPLOAD_PRESET";
-        const USE_CLOUDINARY = false; // Set to true after adding credentials above
+        const CLOUDINARY_CLOUD_NAME = "dpg1ljl62";
+        const CLOUDINARY_UPLOAD_PRESET = "memory_camera_uploads";
+        // Automatically enable if credentials are set
+        const USE_CLOUDINARY = (CLOUDINARY_CLOUD_NAME !== "YOUR_CLOUD_NAME" && CLOUDINARY_UPLOAD_PRESET !== "YOUR_UPLOAD_PRESET");
         
         // Firebase Configuration
         // NOTE: Replace these with your own Firebase project credentials
         // Get them from: https://console.firebase.google.com/
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY_HERE",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            databaseURL: "https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef123456"
         };
 
         // Initialize Firebase
@@ -1819,13 +1912,70 @@
             if (window.pendingRoomJoin) {
                 autoJoinRoom(window.pendingRoomJoin);
                 window.pendingRoomJoin = null;
+            } else if (window.pendingPhotoData) {
+                // Resume photo taking
+                processPhoto(window.pendingPhotoData);
+                window.pendingPhotoData = null;
             } else if (document.getElementById('shareDialog').style.display === 'none' && !currentRoomId) {
-                 // If we were trying to share (which triggered this dialog), re-open share logic
-                 // Since we can't easily know exactly which button was clicked (share vs join),
-                 // we'll just assume if the share dialog isn't open, we probably want to open it or start sharing.
-                 // Actually, better UX: just open the share dialog now that we have a username.
-                 openShareDialog();
+                 // Just updated name, maybe update UI?
             }
+        }
+
+        // Separate function to process photo (called by takePhoto or saveUsername)
+        async function processPhoto(imageDataUrl) {
+            // Upload to Cloudinary (or use base64 if not configured)
+            const photoUrl = await uploadToCloudinary(imageDataUrl);
+            
+            // Save to diary
+            let targetDateStr;
+            
+            // Check if diary page is open and valid
+            const diaryPage = document.getElementById('diaryPage');
+            if (diaryPage.style.display !== 'none' && currentDiaryDate) {
+                targetDateStr = currentDiaryDate;
+            } else {
+                // Default to today
+                const today = new Date();
+                targetDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            }
+            
+            // Initialize diary entry if doesn't exist
+            if (!diaryData[targetDateStr]) {
+                diaryData[targetDateStr] = {
+                    photos: [],
+                    notes: '',
+                    drawing: ''
+                };
+            }
+            
+            if (!diaryData[targetDateStr].photos) {
+                diaryData[targetDateStr].photos = [];
+            }
+            
+            // Add photo URL to diary data (Cloudinary URL or base64)
+            diaryData[targetDateStr].photos.push(photoUrl);
+            const photoIndex = diaryData[targetDateStr].photos.length - 1;
+            
+            // Add to infinite canvas as Polaroid, linking to diary
+            const newPolaroid = addPolaroidToCanvas(photoUrl, targetDateStr, photoIndex, currentUsername);
+            
+            // Sync to shared room if active
+            if (currentRoomId && newPolaroid) {
+                const x = parseFloat(newPolaroid.style.left) || 0;
+                const y = parseFloat(newPolaroid.style.top) || 0;
+                const rotation = parseFloat(newPolaroid.style.transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] || 0);
+                syncPolaroidToRoom(photoUrl, x, y, rotation, targetDateStr, photoIndex, newPolaroid.id);
+            }
+            
+            // If we are currently viewing this date, add it to the page immediately
+            if (currentDiaryDate === targetDateStr && diaryPage.style.display !== 'none') {
+                createDraggablePhoto(photoUrl, photoIndex);
+            }
+            
+            // Save to localStorage
+            saveDiaryData();
+            
+            showMessage('📸 PHOTO CAPTURED!');
         }
 
         function generateRoomCode() {
@@ -1838,6 +1988,11 @@
                 return;
             }
 
+            // Warn about localhost
+            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                alert('⚠️ Note: You are sharing a Localhost link.\n\nFriends NOT on your same WiFi network won\'t be able to open this link.\n\nTo share globally, please deploy your app (e.g. Netlify, Vercel).');
+            }
+
             if (!checkUsername()) return;
 
             // If already in a room, just show the link
@@ -1847,6 +2002,8 @@
                 document.getElementById('leaveRoomSection').style.display = 'block';
                 return;
             }
+            
+            showMessage('⏳ Creating shared room...');
 
             // Create new room
             const roomId = generateRoomCode();
@@ -1855,7 +2012,10 @@
 
             // Upload CURRENT canvas state to the new room
             const polaroids = [];
-            document.querySelectorAll('#infiniteCanvas .polaroid').forEach(el => {
+            const elements = document.querySelectorAll('#infiniteCanvas .polaroid');
+            
+            // Upload local photos to Cloudinary if needed
+            for (let el of elements) {
                 const img = el.querySelector('img');
                 const id = el.id;
                 const x = parseFloat(el.style.left);
@@ -1865,9 +2025,23 @@
                 const date = el.dataset.diaryDate;
                 const index = el.dataset.diaryIndex;
                 
+                let finalUrl = img.src;
+                
+                // Convert local base64 to Cloudinary URL if configured
+                if (finalUrl.startsWith('data:') && typeof uploadToCloudinary === 'function') {
+                    try {
+                        // Show progress
+                        showMessage(`☁️ Uploading photo ${polaroids.length + 1}...`);
+                        finalUrl = await uploadToCloudinary(finalUrl);
+                        img.src = finalUrl; // Update local view
+                    } catch (e) {
+                        console.error('Upload failed during share', e);
+                    }
+                }
+                
                 polaroids.push({
                     id: id,
-                    imageUrl: img.src,
+                    imageUrl: finalUrl,
                     x: x,
                     y: y,
                     rotation: rotation,
@@ -1876,14 +2050,24 @@
                     username: currentUsername, // Claim ownership of existing local items
                     timestamp: Date.now()
                 });
-            });
+            }
 
             // Initialize room with current canvas state
-            await currentRoomRef.set({
-                createdAt: Date.now(),
-                creator: currentUsername,
-                polaroids: {} // Will be populated individually to allow keys
-            });
+            try {
+                await currentRoomRef.set({
+                    createdAt: Date.now(),
+                    creator: currentUsername,
+                    polaroids: {} // Will be populated individually to allow keys
+                });
+            } catch (e) {
+                console.error('Room creation failed:', e);
+                if (e.code === 'PERMISSION_DENIED') {
+                    alert('🔥 Firebase Permission Denied!\n\nUnable to create shared room. Please update your Database Rules.\n\nSee FIREBASE_RULES.md.');
+                } else {
+                    alert('Failed to create shared room: ' + e.message);
+                }
+                return; // Stop execution
+            }
             
             // Push all existing polaroids
             polaroids.forEach(p => {
@@ -1892,6 +2076,9 @@
 
             // Listen for changes
             setupRoomListeners();
+            
+            // Join presence (show who's online)
+            joinPresence();
 
             // Generate and display shareable link
             const shareableLink = generateShareableLink(roomId);
@@ -1905,6 +2092,74 @@
             window.history.replaceState({}, '', url);
 
             showMessage(`✨ Shareable link created!`);
+        }
+
+        // Presence tracking
+        let myPresenceRef = null;
+        
+        function joinPresence() {
+            if (!currentRoomRef || !currentUsername) return;
+            
+            // Create unique ID for this session
+            const sessionId = 'user_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            myPresenceRef = currentRoomRef.child('users').child(sessionId);
+            
+            // Set presence
+            myPresenceRef.set({
+                username: currentUsername,
+                joinedAt: Date.now()
+            });
+            
+            // Remove on disconnect
+            myPresenceRef.onDisconnect().remove();
+            
+            // Listen for user changes
+            currentRoomRef.child('users').on('value', (snapshot) => {
+                updateFriendsList(snapshot.val());
+            });
+            
+            // Show friends panel
+            document.getElementById('friendsOnline').style.display = 'block';
+        }
+        
+        function leavePresence() {
+            if (myPresenceRef) {
+                myPresenceRef.remove();
+                myPresenceRef = null;
+            }
+            
+            // Hide friends panel
+            document.getElementById('friendsOnline').style.display = 'none';
+            
+            // Clear listener
+            if (currentRoomRef) {
+                currentRoomRef.child('users').off();
+            }
+        }
+        
+        function updateFriendsList(users) {
+            const listDiv = document.getElementById('friendsList');
+            if (!users) {
+                listDiv.innerHTML = '<div style="font-family: \'Indie Flower\'; font-size: 14px; color: #999;">nobody here yet...</div>';
+                return;
+            }
+            
+            const userList = Object.values(users);
+            listDiv.innerHTML = '';
+            
+            userList.forEach(user => {
+                const friendItem = document.createElement('div');
+                friendItem.className = 'friend-item';
+                friendItem.textContent = user.username;
+                
+                // Highlight yourself
+                if (user.username === currentUsername) {
+                    friendItem.textContent += ' (you)';
+                    friendItem.style.fontWeight = 'bold';
+                }
+                
+                listDiv.appendChild(friendItem);
+            });
         }
 
         function setupRoomListeners() {
@@ -1976,18 +2231,20 @@
                 timestamp: Date.now()
             };
             
-            // Use the ID as the key if possible, or push with ID in data
-            // Push generates a new key. If we want to use our ID as key:
-            // currentRoomRef.child('polaroids').child(id).set(polaroidData);
-            // But setupRoomListeners uses child_added on 'polaroids'.
-            // If we use .child(id).set(), child_added still fires.
-            // This prevents duplicates if we re-sync or if we use the ID as the key.
-            // Let's use push() for now but include the ID in the data, as setupRoomListeners checks for data.id.
-            
-            currentRoomRef.child('polaroids').push(polaroidData);
+            // Use push() with error handling
+            const pushRef = currentRoomRef.child('polaroids').push();
+            pushRef.set(polaroidData).catch(error => {
+                console.error("Sync failed:", error);
+                if (error.code === 'PERMISSION_DENIED') {
+                    alert('🔥 Firebase Permission Denied!\n\nYou need to update your Database Rules to allow public read/write.\n\nSee FIREBASE_RULES.md for the fix.');
+                }
+            });
         }
 
         function leaveSharedRoom() {
+            // Leave presence first
+            leavePresence();
+            
             if (currentRoomRef) {
                 currentRoomRef.off(); // Remove listeners
             }
@@ -2063,7 +2320,52 @@
                     autoJoinRoom(roomParam);
                 }, 1000); // Small delay to ensure everything is initialized
             }
+
+            // Check Configuration
+            checkConfiguration();
         });
+
+        function checkConfiguration() {
+            let missingConfig = false;
+            
+            // Check Firebase
+            if (firebaseConfig.apiKey === "YOUR_API_KEY_HERE") {
+                document.getElementById('check-firebase-api').textContent = "❌ API Key missing (replace YOUR_API_KEY_HERE)";
+                missingConfig = true;
+            } else {
+                document.getElementById('check-firebase-api').textContent = "✅ API Key found";
+                document.getElementById('check-firebase-api').style.color = "green";
+            }
+
+            if (firebaseConfig.projectId === "YOUR_PROJECT_ID") {
+                document.getElementById('check-firebase-id').textContent = "❌ Project ID missing";
+                missingConfig = true;
+            } else {
+                document.getElementById('check-firebase-id').textContent = "✅ Project ID found";
+                document.getElementById('check-firebase-id').style.color = "green";
+            }
+
+            // Check Cloudinary
+            if (CLOUDINARY_CLOUD_NAME === "YOUR_CLOUD_NAME") {
+                document.getElementById('check-cloudinary-name').textContent = "❌ Cloud Name missing";
+                missingConfig = true;
+            } else {
+                document.getElementById('check-cloudinary-name').textContent = "✅ Cloud Name found";
+                document.getElementById('check-cloudinary-name').style.color = "green";
+            }
+
+            if (CLOUDINARY_UPLOAD_PRESET === "YOUR_UPLOAD_PRESET") {
+                document.getElementById('check-cloudinary-preset').textContent = "❌ Upload Preset missing";
+                missingConfig = true;
+            } else {
+                document.getElementById('check-cloudinary-preset').textContent = "✅ Upload Preset found";
+                document.getElementById('check-cloudinary-preset').style.color = "green";
+            }
+
+            if (missingConfig) {
+                document.getElementById('setupDialog').style.display = 'flex';
+            }
+        }
 
         // Auto-join room when clicking a shared link
         async function autoJoinRoom(roomCode) {
@@ -2086,7 +2388,15 @@
 
             // Check if room exists
             const roomRef = database.ref('rooms/' + roomCode);
-            const snapshot = await roomRef.once('value');
+            let snapshot;
+            
+            try {
+                snapshot = await roomRef.once('value');
+            } catch (e) {
+                console.error('Firebase Error:', e);
+                alert('Unable to connect to the shared room.\n\nPossible causes:\n1. Internet connection issues\n2. Firebase security rules blocking access\n3. Invalid Firebase configuration\n\nError: ' + e.message);
+                return;
+            }
 
             if (!snapshot.exists()) {
                 showMessage('❌ Room not found');
@@ -2102,6 +2412,9 @@
 
             // Listen for changes (and initial load)
             setupRoomListeners();
+            
+            // Join presence (show who's online)
+            joinPresence();
 
             showMessage(`🚪 Joined shared canvas: ${roomCode}`);
         }
@@ -2150,6 +2463,9 @@
 
             // Listen for changes (and initial load)
             setupRoomListeners();
+            
+            // Join presence (show who's online)
+            joinPresence();
 
             // Update UI
             document.getElementById('shareLinkDisplay').style.display = 'block';
@@ -2204,7 +2520,22 @@
                 console.log('Camera access granted!', stream);
             } catch (error) {
                 console.error('Camera access denied:', error);
-                showMessage('✗ CAMERA DENIED');
+                let errorMessage = '✗ CAMERA DENIED';
+                
+                if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    errorMessage = '🔒 PERMISSION BLOCKED';
+                    alert('Camera permission was blocked.\n\nPlease reset permissions:\n1. Click the lock/settings icon in your address bar\n2. Find "Camera" permissions\n3. Select "Allow" or "Reset"\n4. Refresh the page');
+                } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                    errorMessage = '🚫 NO CAMERA FOUND';
+                    alert('No camera device found on your system.');
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    errorMessage = '⚠️ CAMERA IN USE';
+                    alert('Camera is already in use by another application (Zoom, FaceTime, etc). Please close other apps and try again.');
+                } else {
+                    alert('Camera Error: ' + error.message);
+                }
+                
+                showMessage(errorMessage);
             }
         }
 
@@ -2275,6 +2606,39 @@
 
         // Take photo
         async function takePhoto() {
+            // Check for username first
+            if (!checkUsername()) {
+                // We need to capture the photo but wait for the username
+                // Or just wait to take the photo until they have a name?
+                // "ask for a name after they take the first photo"
+                // So let's capture it now, but don't save/display until we have a name.
+                
+                const video = document.getElementById('videoPreview');
+                const canvas = document.getElementById('photoCanvas');
+                const context = canvas.getContext('2d');
+                
+                canvas.width = 480;
+                canvas.height = 480;
+                
+                // Draw video frame
+                const videoAspect = video.videoWidth / video.videoHeight;
+                let sx, sy, sw, sh;
+                
+                if (videoAspect > 1) {
+                    sh = video.videoHeight; sw = sh; sx = (video.videoWidth - sw) / 2; sy = 0;
+                } else {
+                    sw = video.videoWidth; sh = sw; sx = 0; sy = (video.videoHeight - sh) / 2;
+                }
+                
+                context.save();
+                context.scale(-1, 1);
+                context.drawImage(video, sx, sy, sw, sh, -canvas.width, 0, canvas.width, canvas.height);
+                context.restore();
+                
+                window.pendingPhotoData = canvas.toDataURL('image/png');
+                return; // Stop here, saveUsername will resume
+            }
+
             const video = document.getElementById('videoPreview');
             const canvas = document.getElementById('photoCanvas');
             const context = canvas.getContext('2d');
@@ -2306,64 +2670,9 @@
             context.drawImage(video, sx, sy, sw, sh, -canvas.width, 0, canvas.width, canvas.height);
             context.restore();
             
-            // Get image data
+            // Get image data and process
             const imageDataUrl = canvas.toDataURL('image/png');
-            
-            // Upload to Cloudinary (or use base64 if not configured)
-            const photoUrl = await uploadToCloudinary(imageDataUrl);
-            
-            // Save to diary
-            let targetDateStr;
-            
-            // Check if diary page is open and valid
-            const diaryPage = document.getElementById('diaryPage');
-            if (diaryPage.style.display !== 'none' && currentDiaryDate) {
-                targetDateStr = currentDiaryDate;
-            } else {
-                // Default to today
-                const today = new Date();
-                targetDateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-            }
-            
-            // Initialize diary entry if doesn't exist
-            if (!diaryData[targetDateStr]) {
-                diaryData[targetDateStr] = {
-                    photos: [],
-                    notes: '',
-                    drawing: ''
-                };
-            }
-            
-            if (!diaryData[targetDateStr].photos) {
-                diaryData[targetDateStr].photos = [];
-            }
-            
-            // Add photo URL to diary data (Cloudinary URL or base64)
-            diaryData[targetDateStr].photos.push(photoUrl);
-            const photoIndex = diaryData[targetDateStr].photos.length - 1;
-            
-            // Add to infinite canvas as Polaroid, linking to diary
-            const newPolaroid = addPolaroidToCanvas(photoUrl, targetDateStr, photoIndex, currentUsername);
-            
-            // Sync to shared room if active
-            if (currentRoomId && newPolaroid) {
-                const x = parseFloat(newPolaroid.style.left) || 0;
-                const y = parseFloat(newPolaroid.style.top) || 0;
-                const rotation = parseFloat(newPolaroid.style.transform.match(/rotate\(([-\d.]+)deg\)/)?.[1] || 0);
-                syncPolaroidToRoom(photoUrl, x, y, rotation, targetDateStr, photoIndex, newPolaroid.id);
-            }
-            
-            // If we are currently viewing this date, add it to the page immediately
-            if (currentDiaryDate === targetDateStr && diaryPage.style.display !== 'none') {
-                createDraggablePhoto(imageDataUrl, photoIndex);
-            }
-            
-            // Save to localStorage
-            saveDiaryData();
-            
-            // No view switching - stay on same page
-            
-            showMessage('📸 PHOTO CAPTURED!');
+            processPhoto(imageDataUrl);
         }
 
         // Canvas state
@@ -2473,11 +2782,12 @@
             if (username) {
                 const userTag = document.createElement('div');
                 userTag.className = 'user-tag';
+                // Mark own items for subtle styling
+                if (username === currentUsername) {
+                    userTag.classList.add('own-item');
+                }
                 userTag.textContent = username;
                 polaroid.appendChild(userTag);
-                
-                // If it's someone else's photo, maybe style it slightly differently or disable delete?
-                // For now we keep full access but visual distinction is key
             }
             
             // Make Polaroid draggable
@@ -2604,10 +2914,24 @@
             
             polaroid.appendChild(stickerElement);
             
+            // Add username tag if it's my sticker
+            if (currentUsername) {
+                const userTag = document.createElement('div');
+                userTag.className = 'user-tag';
+                userTag.textContent = currentUsername;
+                stickerElement.appendChild(userTag);
+            }
+            
             // Save to diary if linked
             if (polaroid.dataset.diaryDate && polaroid.dataset.diaryIndex) {
                 const date = polaroid.dataset.diaryDate;
                 const index = parseInt(polaroid.dataset.diaryIndex);
+                
+                // Calculate percentages for responsive positioning
+                const width = polaroid.offsetWidth;
+                const height = polaroid.offsetHeight;
+                const xPercent = x / width;
+                const yPercent = y / height;
                 
                 if (diaryData[date]) {
                     if (!diaryData[date].photoStickers) diaryData[date].photoStickers = {};
@@ -2617,7 +2941,10 @@
                         text: stickerText,
                         x: x + 'px',
                         y: y + 'px',
-                        classes: stickerClasses
+                        xPercent: xPercent,
+                        yPercent: yPercent,
+                        classes: stickerClasses,
+                        username: currentUsername // Save username
                     });
                     saveDiaryData();
                 }
@@ -3483,29 +3810,39 @@
                 }
             };
             
-            // Restore saved stickers
-            if (diaryData[currentDiaryDate]?.photoStickers?.[index]) {
-                diaryData[currentDiaryDate].photoStickers[index].forEach(s => {
-                    // Ensure numeric coordinates
-                    let x = parseFloat(s.x);
-                    let y = parseFloat(s.y);
-                    if (isNaN(x)) x = 50;
-                    if (isNaN(y)) y = 50;
-                    addStickerToDiaryPhoto(photo, s.text, x, y, s.classes);
-                });
-            }
-            
             // Make draggable
             makeDraggable(photo);
             
-            // Add to appropriate page
+            // Add to appropriate page (append first so we can calculate dimensions for stickers)
             const container = page === 'left' ? 
                 document.getElementById('diaryLeftPage') : 
                 document.getElementById('diaryRightPage');
             container.appendChild(photo);
+
+            // Restore saved stickers
+            if (diaryData[currentDiaryDate]?.photoStickers?.[index]) {
+                diaryData[currentDiaryDate].photoStickers[index].forEach(s => {
+                    let x, y;
+                    
+                    // Use percentage if available (responsive positioning)
+                    if (s.xPercent !== undefined && s.yPercent !== undefined) {
+                        x = s.xPercent * photo.offsetWidth;
+                        y = s.yPercent * photo.offsetHeight;
+                    } else {
+                        // Fallback to pixels
+                        x = parseFloat(s.x);
+                        y = parseFloat(s.y);
+                    }
+                    
+                    if (isNaN(x)) x = 50;
+                    if (isNaN(y)) y = 50;
+                    
+                    addStickerToDiaryPhoto(photo, s.text, x, y, s.classes, s.username);
+                });
+            }
         }
 
-        function addStickerToDiaryPhoto(photo, stickerText, x, y, stickerClasses) {
+        function addStickerToDiaryPhoto(photo, stickerText, x, y, stickerClasses, username = null) {
             const stickerElement = document.createElement('div');
             stickerElement.className = 'diary-sticker ' + (stickerClasses || '');
             stickerElement.textContent = stickerText;
@@ -3516,6 +3853,13 @@
             stickerElement.style.cursor = 'move';
             stickerElement.style.fontSize = '32px';
             stickerElement.style.userSelect = 'none';
+            
+            if (username) {
+                const userTag = document.createElement('div');
+                userTag.className = 'user-tag';
+                userTag.textContent = username;
+                stickerElement.appendChild(userTag);
+            }
             
             let isDragging = false;
             let offsetX, offsetY;
@@ -3885,10 +4229,18 @@
                 // Save stickers
                 const stickers = [];
                 photo.querySelectorAll('.diary-sticker').forEach(s => {
+                    const width = photo.offsetWidth;
+                    const height = photo.offsetHeight;
+                    // Use offsetLeft/Top which are relative to offsetParent (photo)
+                    const x = s.offsetLeft;
+                    const y = s.offsetTop;
+                    
                     stickers.push({
                         text: s.textContent,
-                        x: s.style.left,
-                        y: s.style.top,
+                        x: x + 'px',
+                        y: y + 'px',
+                        xPercent: x / width,
+                        yPercent: y / height,
                         classes: s.className.replace('diary-sticker ', '')
                     });
                 });
