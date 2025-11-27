@@ -314,6 +314,7 @@
             user-select: none;
             z-index: 5;
             pointer-events: auto;
+            overflow: visible !important; /* Ensure name tag is visible */
         }
 
         .polaroid:hover {
@@ -1629,6 +1630,13 @@
                     </button>
                 </div>
                 
+                <!-- Diagnostic Tool -->
+                <div style="margin-top: 30px; text-align: center;">
+                    <button onclick="runDiagnostics()" style="background: transparent; border: 1px dashed #ccc; color: #999; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px;">
+                        🛠️ Troubleshoot Connection
+                    </button>
+                </div>
+                
             </div>
         </div>
     </div>
@@ -1841,18 +1849,19 @@
         const CLOUDINARY_UPLOAD_PRESET = "memory_camera_uploads";
         // Automatically enable if credentials are set
         const USE_CLOUDINARY = (CLOUDINARY_CLOUD_NAME !== "YOUR_CLOUD_NAME" && CLOUDINARY_UPLOAD_PRESET !== "YOUR_UPLOAD_PRESET");
-        
+
         // Firebase Configuration
         // NOTE: Replace these with your own Firebase project credentials
         // Get them from: https://console.firebase.google.com/
         const firebaseConfig = {
-            apiKey: "AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-            authDomain: "your-project.firebaseapp.com",
-            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
-            projectId: "your-project",
-            storageBucket: "your-project.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abcdef123456"
+            apiKey: "AIzaSyA6htSjNBMVrB5r-WIMRxRcHjXf5xPVqT4",
+            authDomain: "memory-camera-fb668.firebaseapp.com",
+            databaseURL: "https://memory-camera-fb668-default-rtdb.firebaseio.com",
+            projectId: "memory-camera-fb668",
+            storageBucket: "memory-camera-fb668.firebasestorage.app",
+            messagingSenderId: "987103239682",
+            appId: "1:987103239682:web:ccade9c88ddec6a0c1d11b",
+            measurementId: "G-Z05Z1Q5DPV"
         };
 
         // Initialize Firebase
@@ -2054,8 +2063,8 @@
 
             // Initialize room with current canvas state
             try {
-                await currentRoomRef.set({
-                    createdAt: Date.now(),
+            await currentRoomRef.set({
+                createdAt: Date.now(),
                     creator: currentUsername,
                     polaroids: {} // Will be populated individually to allow keys
                 });
@@ -2181,8 +2190,12 @@
                 // Position it
                 const polaroid = document.getElementById(data.id);
                 if (polaroid) {
-                    polaroid.style.left = data.x + 'px';
-                    polaroid.style.top = data.y + 'px';
+                    // Safely parse coordinates (handle potential 'px' strings)
+                    const safeX = parseFloat(data.x);
+                    const safeY = parseFloat(data.y);
+                    
+                    polaroid.style.left = safeX + 'px';
+                    polaroid.style.top = safeY + 'px';
                     polaroid.style.transform = `rotate(${data.rotation}deg)`;
                 }
 
@@ -2230,7 +2243,7 @@
                 username: currentUsername,
                 timestamp: Date.now()
             };
-            
+
             // Use push() with error handling
             const pushRef = currentRoomRef.child('polaroids').push();
             pushRef.set(polaroidData).catch(error => {
@@ -2367,6 +2380,82 @@
             }
         }
 
+        // Diagnostic function to test Cloudinary and Firebase
+        async function runDiagnostics() {
+            let results = [];
+            
+            // Test 1: Check variables
+            results.push('--- CONFIGURATION ---');
+            results.push(`Cloudinary Cloud: ${CLOUDINARY_CLOUD_NAME}`);
+            results.push(`Cloudinary Preset: ${CLOUDINARY_UPLOAD_PRESET}`);
+            results.push(`Firebase Enabled: ${isFirebaseEnabled}`);
+            results.push(`Current Username: "${currentUsername}"`);
+            results.push(`Current Room ID: ${currentRoomId || 'None'}`);
+            
+            // Test 2: Cloudinary Upload
+            results.push('\n--- CLOUDINARY TEST ---');
+            try {
+                const testPixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
+                const response = await fetch(testPixel);
+                const blob = await response.blob();
+                const formData = new FormData();
+                formData.append('file', blob);
+                formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+                
+                const uploadRes = await fetch(
+                    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+                    { method: 'POST', body: formData }
+                );
+                const json = await uploadRes.json();
+                
+                if (json.error) {
+                    results.push(`❌ Cloudinary FAILED: ${json.error.message}`);
+                } else if (json.secure_url) {
+                    results.push(`✅ Cloudinary OK: ${json.secure_url.substring(0, 50)}...`);
+                } else {
+                    results.push(`❌ Cloudinary FAILED: No URL returned`);
+                }
+            } catch (e) {
+                results.push(`❌ Cloudinary ERROR: ${e.message}`);
+            }
+            
+            // Test 3: Firebase Write/Read
+            results.push('\n--- FIREBASE TEST ---');
+            if (!database) {
+                results.push('❌ Firebase database not initialized');
+            } else {
+                try {
+                    const testRef = database.ref('_diagnostic_test_' + Date.now());
+                    await testRef.set({ test: 'ok', time: Date.now() });
+                    results.push('✅ Firebase WRITE: Success');
+                    
+                    const snap = await testRef.once('value');
+                    if (snap.val() && snap.val().test === 'ok') {
+                        results.push('✅ Firebase READ: Success');
+                    } else {
+                        results.push('❌ Firebase READ: Data mismatch');
+                    }
+                    await testRef.remove();
+                } catch (e) {
+                    if (e.code === 'PERMISSION_DENIED') {
+                        results.push('❌ Firebase PERMISSION DENIED - Update your Database Rules!');
+                        results.push('   Go to Firebase Console > Realtime Database > Rules');
+                        results.push('   Set: { "rules": { ".read": true, ".write": true } }');
+                    } else {
+                        results.push(`❌ Firebase ERROR: ${e.message}`);
+                    }
+                }
+            }
+            
+            // Test 4: Current canvas state
+            results.push('\n--- CANVAS STATE ---');
+            const polaroids = document.querySelectorAll('#infiniteCanvas .polaroid');
+            results.push(`Photos on canvas: ${polaroids.length}`);
+            
+            alert(results.join('\n'));
+            console.log('Diagnostics:', results);
+        }
+
         // Auto-join room when clicking a shared link
         async function autoJoinRoom(roomCode) {
             if (!isFirebaseEnabled) return;
@@ -2407,11 +2496,17 @@
             currentRoomRef = roomRef;
 
             // Clear current canvas before loading room state
-            document.getElementById('infiniteCanvas').innerHTML = '';
-            polaroidCounter = 0;
+                document.getElementById('infiniteCanvas').innerHTML = '';
+                polaroidCounter = 0;
 
             // Listen for changes (and initial load)
             setupRoomListeners();
+            
+            // Check count for feedback
+            currentRoomRef.child('polaroids').once('value').then(snap => {
+                const count = snap.numChildren();
+                showMessage(`🚪 Joined room! Found ${count} existing photos.`);
+            });
             
             // Join presence (show who's online)
             joinPresence();
@@ -2433,17 +2528,32 @@
                 return;
             }
 
-            // Extract room code from URL if they pasted a full link
+            // Robustly extract room code
             let roomCode = input;
-            if (input.includes('?room=')) {
-                const urlParams = new URLSearchParams(input.split('?')[1]);
-                roomCode = urlParams.get('room');
-            } else if (input.includes('room=')) {
-                const urlParams = new URLSearchParams(input);
-                roomCode = urlParams.get('room') || input;
+            try {
+                // Check if it's a full URL
+                const url = new URL(input);
+                const params = new URLSearchParams(url.search);
+                if (params.has('room')) {
+                    roomCode = params.get('room');
+                }
+            } catch (e) {
+                // Not a full URL, maybe a partial string or just the code
+                if (input.includes('room=')) {
+                    const parts = input.split('room=');
+                    if (parts.length > 1) {
+                        roomCode = parts[1].split('&')[0]; // Handle other params if any
+                    }
+                }
             }
             
-            roomCode = roomCode.toUpperCase();
+            // Clean up code (remove whitespace, hash, etc)
+            roomCode = roomCode.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+            
+            if (roomCode.length < 4) {
+                 alert('Invalid room link or code. Please check and try again.');
+                 return;
+            }
 
             // Check if room exists
             const roomRef = database.ref('rooms/' + roomCode);
@@ -2458,8 +2568,8 @@
             currentRoomRef = roomRef;
 
             // Clear current canvas before loading room state
-            document.getElementById('infiniteCanvas').innerHTML = '';
-            polaroidCounter = 0;
+                document.getElementById('infiniteCanvas').innerHTML = '';
+                polaroidCounter = 0;
 
             // Listen for changes (and initial load)
             setupRoomListeners();
@@ -2743,6 +2853,8 @@
 
         // Add Polaroid to infinite canvas
         function addPolaroidToCanvas(imageDataUrl, diaryDate = null, diaryIndex = null, username = null, existingId = null) {
+            if (!imageDataUrl) return; // Don't add if no image
+            
             const canvas = document.getElementById('infiniteCanvas');
             const polaroid = document.createElement('div');
             polaroid.className = 'polaroid';
@@ -3654,7 +3766,7 @@
             }
             generateCalendar();
         }
-        
+
         // Generate calendar for current month
         function generateCalendar() {
             const grid = document.getElementById('calendarGrid');
