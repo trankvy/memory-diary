@@ -3840,8 +3840,8 @@
             const diaryPage = document.getElementById('diaryPage');
             diaryPage.style.display = 'flex';
             
-            // Set date in header
-            const dateObj = new Date(dateStr);
+            // Set date in header - parse as LOCAL time (add T00:00:00 to avoid UTC interpretation)
+            const dateObj = new Date(dateStr + 'T00:00:00');
             const formatted = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
             document.getElementById('diaryPageDate').textContent = formatted;
             
@@ -4172,7 +4172,8 @@
             if (!currentDiaryDate) return;
             saveDiaryPage();
             
-            const current = new Date(currentDiaryDate);
+            // Parse as local time to avoid timezone issues
+            const current = new Date(currentDiaryDate + 'T00:00:00');
             current.setDate(current.getDate() - 1);
             const prevDate = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
             openDiaryPage(prevDate);
@@ -4183,7 +4184,8 @@
             if (!currentDiaryDate) return;
             saveDiaryPage();
             
-            const current = new Date(currentDiaryDate);
+            // Parse as local time to avoid timezone issues
+            const current = new Date(currentDiaryDate + 'T00:00:00');
             current.setDate(current.getDate() + 1);
             const nextDate = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`;
             openDiaryPage(nextDate);
