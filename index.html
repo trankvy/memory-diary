@@ -13,6 +13,7 @@
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     
     <!-- Cloudinary Upload Widget -->
     <script src="https://upload-widget.cloudinary.com/global/all.js" type="text/javascript"></script>
@@ -1891,15 +1892,41 @@
         };
 
         // Initialize Firebase
-        let firebaseApp, database, currentRoomRef;
+        let firebaseApp, database, currentRoomRef, auth;
         let currentRoomId = null;
         let isFirebaseEnabled = false;
         let currentUsername = localStorage.getItem('memory_camera_username') || '';
+        let currentUserId = null; // Firebase Auth UID
 
         try {
             firebaseApp = firebase.initializeApp(firebaseConfig);
             database = firebase.database();
-            isFirebaseEnabled = true;
+            auth = firebase.auth();
+            
+            // Sign in anonymously for security
+            auth.signInAnonymously()
+                .then((userCredential) => {
+                    currentUserId = userCredential.user.uid;
+                    console.log('Signed in anonymously:', currentUserId);
+                    isFirebaseEnabled = true;
+                })
+                .catch((error) => {
+                    console.warn('Anonymous auth failed:', error);
+                    // Still allow local features
+                });
+            
+            // Listen for auth state changes
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    currentUserId = user.uid;
+                    isFirebaseEnabled = true;
+                    console.log('Auth state: signed in as', currentUserId);
+                } else {
+                    currentUserId = null;
+                    console.log('Auth state: signed out');
+                }
+            });
+            
             console.log('Firebase initialized successfully');
         } catch (error) {
             console.warn('Firebase not configured. Sharing features disabled.', error);
@@ -2083,15 +2110,17 @@
                     diaryDate: date,
                     diaryIndex: index,
                     username: currentUsername, // Claim ownership of existing local items
+                    ownerUid: currentUserId, // Track ownership for security
                     timestamp: Date.now()
                 });
             }
 
             // Initialize room with current canvas state
             try {
-            await currentRoomRef.set({
-                createdAt: Date.now(),
+                await currentRoomRef.set({
+                    createdAt: Date.now(),
                     creator: currentUsername,
+                    creatorUid: currentUserId, // Store Firebase Auth UID for security
                     polaroids: {} // Will be populated individually to allow keys
                 });
             } catch (e) {
@@ -2267,6 +2296,7 @@
                 diaryDate,
                 diaryIndex,
                 username: currentUsername,
+                ownerUid: currentUserId, // Track who added this item for security
                 timestamp: Date.now()
             };
 
