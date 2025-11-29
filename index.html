@@ -1867,19 +1867,12 @@
         let polaroidDragOffsetY = 0;
 
         // Cloudinary Configuration
-        // SETUP INSTRUCTIONS:
-        // 1. Sign up at https://cloudinary.com (free tier available)
-        // 2. Go to Settings > Upload > Add upload preset
-        // 3. Set signing mode to "Unsigned"
-        // 4. Replace YOUR_CLOUD_NAME and YOUR_UPLOAD_PRESET below
         const CLOUDINARY_CLOUD_NAME = "dpg1ljl62";
         const CLOUDINARY_UPLOAD_PRESET = "memory_camera_uploads";
         // Automatically enable if credentials are set
         const USE_CLOUDINARY = (CLOUDINARY_CLOUD_NAME !== "YOUR_CLOUD_NAME" && CLOUDINARY_UPLOAD_PRESET !== "YOUR_UPLOAD_PRESET");
 
         // Firebase Configuration
-        // NOTE: Replace these with your own Firebase project credentials
-        // Get them from: https://console.firebase.google.com/
         const firebaseConfig = {
             apiKey: "AIzaSyA6htSjNBMVrB5r-WIMRxRcHjXf5xPVqT4",
             authDomain: "memory-camera-fb668.firebaseapp.com",
@@ -1907,12 +1900,10 @@
             auth.signInAnonymously()
                 .then((userCredential) => {
                     currentUserId = userCredential.user.uid;
-                    console.log('Signed in anonymously:', currentUserId);
-                    isFirebaseEnabled = true;
+            isFirebaseEnabled = true;
                 })
                 .catch((error) => {
-                    console.warn('Anonymous auth failed:', error);
-                    // Still allow local features
+                    // Auth failed - local features still work
                 });
             
             // Listen for auth state changes
@@ -1920,14 +1911,10 @@
                 if (user) {
                     currentUserId = user.uid;
                     isFirebaseEnabled = true;
-                    console.log('Auth state: signed in as', currentUserId);
                 } else {
                     currentUserId = null;
-                    console.log('Auth state: signed out');
                 }
             });
-            
-            console.log('Firebase initialized successfully');
         } catch (error) {
             console.warn('Firebase not configured. Sharing features disabled.', error);
             isFirebaseEnabled = false;
@@ -2117,8 +2104,8 @@
 
             // Initialize room with current canvas state
             try {
-                await currentRoomRef.set({
-                    createdAt: Date.now(),
+            await currentRoomRef.set({
+                createdAt: Date.now(),
                     creator: currentUsername,
                     creatorUid: currentUserId, // Store Firebase Auth UID for security
                     polaroids: {} // Will be populated individually to allow keys
@@ -2509,7 +2496,7 @@
             results.push(`Photos on canvas: ${polaroids.length}`);
             
             alert(results.join('\n'));
-            console.log('Diagnostics:', results);
+            // console.log('Diagnostics:', results); // Uncomment for debugging
         }
 
         // Auto-join room when clicking a shared link
@@ -2649,13 +2636,13 @@
 
         // Show notification when camera icon is clicked
         function handleCameraClick() {
-            console.log('Camera clicked - showing permission request');
+            // Show permission request
             document.getElementById('cameraNotification').style.display = 'flex';
         }
 
         // Handle allow access
         async function allowAccess() {
-            console.log('Camera access allowed');
+            // Camera access allowed - start stream
             document.getElementById('cameraNotification').style.display = 'none';
             
             try {
@@ -2683,7 +2670,7 @@
                 document.getElementById('takePhotoBtn').disabled = false;
                 
                 showMessage('✓ CAMERA READY!');
-                console.log('Camera access granted!', stream);
+                // Camera access granted
             } catch (error) {
                 console.error('Camera access denied:', error);
                 let errorMessage = '✗ CAMERA DENIED';
@@ -2707,7 +2694,7 @@
 
         // Handle deny access
         function denyAccess() {
-            console.log('Camera access denied by user');
+            // Camera access denied by user
             document.getElementById('cameraNotification').style.display = 'none';
             showMessage('✗ ACCESS DENIED');
             animateCamera();
