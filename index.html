@@ -1308,7 +1308,6 @@
         }
 
         .diary-text-input {
-            position: absolute;
             font-family: 'Caveat', cursive;
             font-size: 22px;
             color: #6b5435;
@@ -1317,15 +1316,41 @@
             padding: 10px;
             resize: none;
             overflow: hidden;
-            cursor: move;
+            cursor: text;
             z-index: 4;
             line-height: 1.4;
+            display: block;
         }
 
         .diary-text-input:focus {
             outline: none;
             border-color: rgba(139, 111, 71, 0.3);
-            cursor: text;
+        }
+        
+        .text-drag-handle {
+            position: absolute;
+            left: -20px;
+            top: 5px;
+            width: 18px;
+            height: 30px;
+            background: rgba(139, 111, 71, 0.8);
+            color: white;
+            border-radius: 4px;
+            cursor: move;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            line-height: 1;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            user-select: none;
+            z-index: 10;
+        }
+        
+        .text-drag-handle:hover {
+            opacity: 1;
+            background: rgba(139, 111, 71, 1);
         }
 
         /* Video Preview */
@@ -4003,15 +4028,29 @@
         }
 
         function createDraggableText(content, x, y, page, index) {
+            // Create wrapper for text + handle
+            const wrapper = document.createElement('div');
+            wrapper.style.position = 'absolute';
+            wrapper.style.left = x + 'px';
+            wrapper.style.top = y + 'px';
+            wrapper.style.display = 'inline-block';
+            
+            // Create drag handle
+            const dragHandle = document.createElement('div');
+            dragHandle.className = 'text-drag-handle';
+            dragHandle.innerHTML = '⋮⋮';
+            dragHandle.title = 'Drag to move';
+            
             const textArea = document.createElement('textarea');
             textArea.className = 'diary-text-input';
             textArea.id = `diary-text-${index}`;
             textArea.value = content || '';
             textArea.placeholder = 'write something...';
-            textArea.style.left = x + 'px';
-            textArea.style.top = y + 'px';
             textArea.style.width = '250px';
             textArea.style.height = 'auto';
+            textArea.style.position = 'relative';
+            textArea.style.left = '0';
+            textArea.style.top = '0';
             
             // Auto resize
             textArea.addEventListener('input', function() {
@@ -4019,17 +4058,56 @@
                 this.style.height = this.scrollHeight + 'px';
             });
             
-            // Make draggable
-            makeDraggable(textArea);
+            wrapper.appendChild(dragHandle);
+            wrapper.appendChild(textArea);
+            
+            // Make wrapper draggable via the handle
+            makeTextDraggable(wrapper, dragHandle, textArea);
             
             // Add to appropriate page
             const container = page === 'left' ? 
                 document.getElementById('diaryLeftPage') : 
                 document.getElementById('diaryRightPage');
-            container.appendChild(textArea);
+            container.appendChild(wrapper);
             
             // Trigger resize
             textArea.dispatchEvent(new Event('input'));
+        }
+        
+        function makeTextDraggable(wrapper, handle, textarea) {
+            let isDragging = false;
+            let startX, startY, initialX, initialY;
+            
+            handle.addEventListener('mousedown', function(e) {
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                
+                const rect = wrapper.getBoundingClientRect();
+                const parent = wrapper.parentElement.getBoundingClientRect();
+                initialX = rect.left - parent.left;
+                initialY = rect.top - parent.top;
+                
+                wrapper.style.zIndex = '15';
+                e.preventDefault();
+            });
+            
+            document.addEventListener('mousemove', function(e) {
+                if (!isDragging) return;
+                
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                
+                wrapper.style.left = (initialX + dx) + 'px';
+                wrapper.style.top = (initialY + dy) + 'px';
+            });
+            
+            document.addEventListener('mouseup', function() {
+                if (isDragging) {
+                    wrapper.style.zIndex = '4';
+                    isDragging = false;
+                }
+            });
         }
 
         function makeDraggable(element) {
@@ -4300,8 +4378,12 @@
             // Also clear all photos on the page
             document.querySelectorAll('.diary-draggable-photo').forEach(photo => photo.remove());
             
-            // Also clear all text entries
-            document.querySelectorAll('.diary-text-input').forEach(input => input.remove());
+            // Also clear all text entries (remove the wrapper divs)
+            document.querySelectorAll('.diary-text-input').forEach(input => {
+                if (input.parentElement) {
+                    input.parentElement.remove(); // Remove the wrapper div
+                }
+            });
         }
 
         // Save diary page
@@ -4367,14 +4449,15 @@
             // Save text content and positions
             diaryData[currentDiaryDate].texts = [];
             document.querySelectorAll('.diary-text-input').forEach((textarea) => {
-                const parent = textarea.parentElement;
-                const page = parent.id === 'diaryLeftPage' ? 'left' : 'right';
+                const wrapper = textarea.parentElement;
+                const container = wrapper.parentElement;
+                const page = container.id === 'diaryLeftPage' ? 'left' : 'right';
                 
                 if (textarea.value.trim()) { // Only save non-empty texts
                     diaryData[currentDiaryDate].texts.push({
                         content: textarea.value,
-                        x: parseFloat(textarea.style.left) || 0,
-                        y: parseFloat(textarea.style.top) || 0,
+                        x: parseFloat(wrapper.style.left) || 0,
+                        y: parseFloat(wrapper.style.top) || 0,
                         page: page
                     });
                 }
